@@ -1,0 +1,229 @@
+{
+  "name": "AI Software Engineering Factory - Configurable AI Gateway",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "factory-ai-gateway",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "697e0b05-1d3c-4908-8e5f-30963c8b7fe7",
+      "name": "Webhook - AI Request",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -496,
+        16
+      ],
+      "webhookId": "98c22c76-60df-49a3-a169-7636a61feceb"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "eff26b00-ff6a-43f4-bd44-9eed56c95368",
+              "name": "baseUrl",
+              "value": "https://openrouter.ai/api/v1",
+              "type": "string"
+            },
+            {
+              "id": "636f3ded-9d1d-4cc6-a85e-91efb87b0bf8",
+              "name": "model",
+              "value": "openai/gpt-4o-mini",
+              "type": "string"
+            },
+            {
+              "id": "ad6d73b1-cb16-44a4-8687-d4d0da173f27",
+              "name": "systemPrompt",
+              "value": "You are an assistant inside an AI software engineering factory. Follow the requested task, be precise, and return only claims supported by your reasoning or available evidence.",
+              "type": "string"
+            },
+            {
+              "id": "aa072916-14d4-419a-97ad-294f6be9b1c1",
+              "name": "prompt",
+              "value": "={{ $json.body?.prompt ?? $json.prompt ?? '' }}",
+              "type": "string"
+            },
+            {
+              "id": "1bb26aad-6125-423e-8d3f-91d149d33339",
+              "name": "temperature",
+              "value": 0.2,
+              "type": "number"
+            },
+            {
+              "id": "0c552812-bf75-46b7-8c0d-a4d449e8b9fd",
+              "name": "maxTokens",
+              "value": 2000,
+              "type": "number"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "ce393ea3-aadb-47ba-a8fd-c0795eb92824",
+      "name": "AI Provider Configuration",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -256,
+        16
+      ],
+      "notesInFlow": true,
+      "notes": "Edit baseUrl and model here. Use a base URL ending in /v1 (for example https://openrouter.ai/api/v1 or https://api.example.com/v1). The workflow appends /chat/completions. Store the API key in the HTTP Header Auth credential, not in this node."
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first();\nconst j = item.json;\n\nconst prompt = String(j.prompt ?? '').trim();\nif (!prompt) {\n  throw new Error('Missing prompt. Send POST JSON with a non-empty \"prompt\" field.');\n}\n\nconst rawBase = String(j.baseUrl ?? '').trim().replace(/\\\\/+$/, '');\nlet parsed;\ntry {\n  parsed = new URL(rawBase);\n} catch {\n  throw new Error('AI Provider Configuration: baseUrl must be a valid absolute URL.');\n}\nif (!['https:', 'http:'].includes(parsed.protocol)) {\n  throw new Error('AI Provider Configuration: baseUrl must use HTTP or HTTPS.');\n}\nif (parsed.username || parsed.password) {\n  throw new Error('Do not place credentials in baseUrl. Configure authentication using n8n credentials.');\n}\n\nconst model = String(j.model ?? '').trim();\nif (!model || model === 'YOUR_MODEL_ID') {\n  throw new Error('Configure a valid model ID in the AI Provider Configuration node.');\n}\n\nreturn [{\n  json: {\n    baseUrl: rawBase,\n    model,\n    systemPrompt: String(j.systemPrompt ?? ''),\n    prompt,\n    temperature: Number(j.temperature ?? 0.2),\n    maxTokens: Math.max(1, Math.min(32000, Number(j.maxTokens ?? 2000))),\n    requestId: j.body?.requestId ?? j.requestId ?? null\n  }\n}];"
+      },
+      "id": "4f6a44fc-dd58-453f-9fe6-b69ef403cb41",
+      "name": "Validate Request and Provider",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -16,
+        16
+      ],
+      "notes": "Validates required inputs and normalizes the provider base URL. This is a basic configuration guard, not a complete SSRF/network security boundary."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.baseUrl + '/chat/completions' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ model: $json.model, messages: [{ role: 'system', content: $json.systemPrompt }, { role: 'user', content: $json.prompt }], temperature: $json.temperature, max_tokens: $json.maxTokens, stream: false }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 120000
+        }
+      },
+      "id": "a6b69663-f342-42a3-ac79-37240d7a0363",
+      "name": "Call OpenAI-Compatible API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        272,
+        16
+      ],
+      "notesInFlow": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "wOD2b7jcii5vH9PR",
+          "name": "Header Auth account"
+        }
+      },
+      "notes": "Create an n8n Header Auth credential with header name Authorization and value Bearer YOUR_API_KEY. Attach it to this node. Some providers require extra headers or use different endpoints; configure those here."
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nconst choices = response?.choices;\nif (!Array.isArray(choices) || !choices[0]?.message) {\n  const status = response?.statusCode ?? response?.status ?? null;\n  const detail = response?.error?.message ?? response?.message ?? 'Provider response did not contain choices[0].message.';\n  return [{ json: { ok: false, error: String(detail), statusCode: status, providerResponse: response } }];\n}\n\nreturn [{\n  json: {\n    ok: true,\n    model: response.model ?? null,\n    content: choices[0].message.content ?? '',\n    finishReason: choices[0].finish_reason ?? null,\n    usage: response.usage ?? null,\n    providerResponseId: response.id ?? null\n  }\n}];"
+      },
+      "id": "a0939559-1b80-4eab-b4b7-21b1ba73d553",
+      "name": "Normalize Provider Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        544,
+        16
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseCode": "={{ $json.ok ? 200 : 502 }}"
+        }
+      },
+      "id": "1d36ac42-1a85-401f-849e-965817f387e2",
+      "name": "Return JSON Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        832,
+        16
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook - AI Request": {
+      "main": [
+        [
+          {
+            "node": "AI Provider Configuration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Provider Configuration": {
+      "main": [
+        [
+          {
+            "node": "Validate Request and Provider",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Request and Provider": {
+      "main": [
+        [
+          {
+            "node": "Call OpenAI-Compatible API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call OpenAI-Compatible API": {
+      "main": [
+        [
+          {
+            "node": "Normalize Provider Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Provider Response": {
+      "main": [
+        [
+          {
+            "node": "Return JSON Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  }
+}
