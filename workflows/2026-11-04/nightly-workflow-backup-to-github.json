@@ -1,0 +1,156 @@
+{
+  "name": "Nightly Workflow Backup to GitHub",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "### If something breaks\n\nThe read and AI nodes here **retry 3× automatically** (5s apart), which absorbs rate limits and brief timeouts.\n\nNodes that **send or write deliberately do not retry** — a send that reached the far end but lost its response would otherwise fire twice, so you'd get duplicate messages or duplicate rows.\n\nTo be told when one of those fails, build a workflow starting with an **Error Trigger** node that posts to Slack or email, then set it under **three-dot menu > Settings > Error Workflow**. Do it once and point every workflow at it.",
+        "height": 400,
+        "width": 400,
+        "color": 3
+      },
+      "id": "5b2d358b-377f-4071-bc71-1efb42b418ab",
+      "name": "If something breaks",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        272,
+        1056
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 2 * * *"
+            }
+          ]
+        }
+      },
+      "id": "65fa86cb-a270-415b-9d21-1ae8fadea63b",
+      "name": "Nightly 2am",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        720,
+        32
+      ]
+    },
+    {
+      "parameters": {
+        "url": "http://129.146.31.100:5678/api/v1/workflows",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "f92c45ed-1a19-4038-a23c-02f44a36912a",
+      "name": "List All Workflows",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        944,
+        32
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "wOD2b7jcii5vH9PR",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json.data || [];\nconst today = new Date().toISOString().slice(0, 10);\nreturn data.map(wf => {\n  const slug = wf.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || `workflow-${wf.id}`;\n  return { json: {\n    path: `workflows/${today}/${slug}.json`,\n    content: JSON.stringify({ name: wf.name, nodes: wf.nodes, connections: wf.connections, settings: wf.settings }, null, 2),\n    message: `backup: ${wf.name}`\n  } };\n});"
+      },
+      "id": "1fe70850-088e-4f5c-8c14-e86d7b5b0f2f",
+      "name": "One File per Workflow",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1152,
+        32
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "owner": {
+          "__rl": true,
+          "value": "victorikaraoha23",
+          "mode": "list",
+          "cachedResultName": "victorikaraoha23",
+          "cachedResultUrl": "https://github.com/victorikaraoha23"
+        },
+        "repository": {
+          "__rl": true,
+          "value": "N8N-PROJECTS",
+          "mode": "name"
+        },
+        "filePath": "={{ $json.path }}",
+        "fileContent": "={{ $json.content }}",
+        "commitMessage": "={{ $json.message }}"
+      },
+      "id": "befd667a-6686-4c8a-b455-10ac8799ace1",
+      "name": "Commit to GitHub",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1.1,
+      "position": [
+        1376,
+        32
+      ],
+      "webhookId": "abbf0822-71b6-4519-a15a-a806bddb8ab4",
+      "credentials": {
+        "githubApi": {
+          "id": "n7jUeXRd8ZbdEArn",
+          "name": "GitHub account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Nightly 2am": {
+      "main": [
+        [
+          {
+            "node": "List All Workflows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List All Workflows": {
+      "main": [
+        [
+          {
+            "node": "One File per Workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "One File per Workflow": {
+      "main": [
+        [
+          {
+            "node": "Commit to GitHub",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}
