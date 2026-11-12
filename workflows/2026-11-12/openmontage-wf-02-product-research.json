@@ -1,0 +1,2021 @@
+{
+  "name": "OpenMontage - WF-02 Product Research",
+  "nodes": [
+    {
+      "id": "f9fd8777-f88b-485c-a07b-1cbadacba27a",
+      "name": "Research Request",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {
+        "inputSource": "workflowInputs",
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "canonicalUrl",
+              "type": "string"
+            },
+            {
+              "name": "chatId",
+              "type": "string"
+            },
+            {
+              "name": "senderId",
+              "type": "string"
+            },
+            {
+              "name": "requestId",
+              "type": "string"
+            }
+          ]
+        },
+        "returnOutput": "lastRunOnly"
+      }
+    },
+    {
+      "id": "59d0effe-edf4-4232-809c-10c7d0a90729",
+      "name": "Find Registered Product",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        540,
+        300
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "getAll",
+        "authentication": "secretKey",
+        "tableId": "products",
+        "returnAll": false,
+        "limit": 1,
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "canonical_url",
+              "condition": "eq",
+              "keyValue": "={{ $(\"Research Request\").first().json.canonicalUrl }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "VIp2iiJEEE7xS20g",
+          "name": "Supabase account 2"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "2dc50a6f-3885-4d40-ac90-dd8d9fb74aca",
+      "name": "Product Registered?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        840,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.id }}",
+              "operator": {
+                "type": "string",
+                "operation": "exists"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "97627f9e-d546-4794-948d-82304244ad0f",
+      "name": "Return Product Found",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1140,
+        200
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "status-found",
+              "name": "status",
+              "value": "found",
+              "type": "string"
+            },
+            {
+              "id": "product-id",
+              "name": "productId",
+              "value": "={{ $('Find Registered Product').first().json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "product-name",
+              "name": "productName",
+              "value": "={{ $('Find Registered Product').first().json.name }}",
+              "type": "string"
+            },
+            {
+              "id": "canonical-url",
+              "name": "canonicalUrl",
+              "value": "={{ $('Find Registered Product').first().json.canonical_url }}",
+              "type": "string"
+            },
+            {
+              "id": "chat-id",
+              "name": "chatId",
+              "value": "={{ $('Research Request').first().json.chatId }}",
+              "type": "string"
+            },
+            {
+              "id": "sender-id",
+              "name": "senderId",
+              "value": "={{ $('Research Request').first().json.senderId }}",
+              "type": "string"
+            },
+            {
+              "id": "research-run-id",
+              "name": "researchRunId",
+              "value": "={{ $json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "research-run-status",
+              "name": "researchRunStatus",
+              "value": "={{ $json.status }}",
+              "type": "string"
+            },
+            {
+              "id": "research-run-reused",
+              "name": "researchRunReused",
+              "value": false,
+              "type": "boolean"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "9a7217c9-68e0-49f6-97ff-13f348421320",
+      "name": "Return Product Not Found",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1140,
+        420
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "status-not-found",
+              "name": "status",
+              "value": "not_found",
+              "type": "string"
+            },
+            {
+              "id": "canonical-url",
+              "name": "canonicalUrl",
+              "value": "={{ $(\"Research Request\").first().json.canonicalUrl }}",
+              "type": "string"
+            },
+            {
+              "id": "chat-id",
+              "name": "chatId",
+              "value": "={{ $(\"Research Request\").first().json.chatId }}",
+              "type": "string"
+            },
+            {
+              "id": "sender-id",
+              "name": "senderId",
+              "value": "={{ $(\"Research Request\").first().json.senderId }}",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "57d81a58-b9cc-4dfb-96f1-cabc6905d0af",
+      "name": "Find Existing Research Run",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1120,
+        300
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "getAll",
+        "authentication": "secretKey",
+        "tableId": "research_runs",
+        "returnAll": false,
+        "limit": 1,
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "idempotency_key",
+              "condition": "eq",
+              "keyValue": "={{ 'telegram:' + $('Research Request').first().json.chatId + ':' + $('Research Request').first().json.requestId }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "VIp2iiJEEE7xS20g",
+          "name": "Supabase account 2"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "7b838afb-7a13-4823-b8f7-bc1a7a5e6bec",
+      "name": "Research Run Already Exists?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1400,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.id }}",
+              "operator": {
+                "type": "string",
+                "operation": "exists"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "93a11afc-28d5-4b16-b648-beddc062c608",
+      "name": "Create Research Run",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1680,
+        420
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "create",
+        "authentication": "secretKey",
+        "tableId": "research_runs",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "product_id",
+              "fieldValue": "={{ $('Find Registered Product').first().json.id }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "pending"
+            },
+            {
+              "fieldId": "idempotency_key",
+              "fieldValue": "={{ 'telegram:' + $('Research Request').first().json.chatId + ':' + $('Research Request').first().json.requestId }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "VIp2iiJEEE7xS20g",
+          "name": "Supabase account 2"
+        }
+      }
+    },
+    {
+      "id": "cb18380c-2081-4fd4-ae19-2f897ad78e32",
+      "name": "Return Existing Research Run",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1680,
+        180
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "status-found-existing",
+              "name": "status",
+              "value": "found",
+              "type": "string"
+            },
+            {
+              "id": "product-id-existing",
+              "name": "productId",
+              "value": "={{ $('Find Registered Product').first().json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "product-name-existing",
+              "name": "productName",
+              "value": "={{ $('Find Registered Product').first().json.name }}",
+              "type": "string"
+            },
+            {
+              "id": "canonical-url-existing",
+              "name": "canonicalUrl",
+              "value": "={{ $('Find Registered Product').first().json.canonical_url }}",
+              "type": "string"
+            },
+            {
+              "id": "chat-id-existing",
+              "name": "chatId",
+              "value": "={{ $('Research Request').first().json.chatId }}",
+              "type": "string"
+            },
+            {
+              "id": "sender-id-existing",
+              "name": "senderId",
+              "value": "={{ $('Research Request').first().json.senderId }}",
+              "type": "string"
+            },
+            {
+              "id": "research-run-id-existing",
+              "name": "researchRunId",
+              "value": "={{ $json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "research-run-status-existing",
+              "name": "researchRunStatus",
+              "value": "={{ $json.status }}",
+              "type": "string"
+            },
+            {
+              "id": "research-run-reused",
+              "name": "researchRunReused",
+              "value": true,
+              "type": "boolean"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "7f44bde4-d1f4-451d-8ef0-2e061fdcf20b",
+      "name": "Fetch Homepage",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1980,
+        300
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.canonicalUrl }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "OpenMontageResearchBot/1.0 (+public website research)"
+            },
+            {
+              "name": "Accept",
+              "value": "text/html,application/xhtml+xml"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 15000,
+          "redirect": {
+            "redirect": {
+              "followRedirects": false,
+              "maxRedirects": 0
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "responseFormat": "text",
+              "neverError": true,
+              "outputPropertyName": "body"
+            }
+          }
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000
+    },
+    {
+      "id": "1d372fec-12cc-4c0a-96c4-aa82cec2db93",
+      "name": "Homepage HTTP Success?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2260,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.statusCode }}",
+              "rightValue": 200,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            },
+            {
+              "leftValue": "={{ $json.statusCode }}",
+              "rightValue": 300,
+              "operator": {
+                "type": "number",
+                "operation": "lt"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "1afbb948-e324-498c-8609-c52ac4eb0505",
+      "name": "Extract Homepage",
+      "type": "n8n-nodes-base.html",
+      "typeVersion": 1.2,
+      "position": [
+        2540,
+        200
+      ],
+      "parameters": {
+        "operation": "extractHtmlContent",
+        "sourceData": "json",
+        "dataPropertyName": "body",
+        "extractionValues": {
+          "values": [
+            {
+              "key": "title",
+              "cssSelector": "title",
+              "returnValue": "text"
+            },
+            {
+              "key": "description",
+              "cssSelector": "meta[name=\"description\"]",
+              "returnValue": "attribute",
+              "attribute": "content"
+            },
+            {
+              "key": "pageText",
+              "cssSelector": "body",
+              "returnValue": "text"
+            },
+            {
+              "key": "links",
+              "cssSelector": "a",
+              "returnValue": "attribute",
+              "attribute": "href",
+              "returnArray": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "490a49cf-98a9-4ee6-b442-d3f24946f850",
+      "name": "Find Existing Homepage Source",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2820,
+        200
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "getAll",
+        "authentication": "secretKey",
+        "tableId": "product_sources",
+        "returnAll": false,
+        "limit": 1,
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "research_run_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Find Existing Research Run').first().json.id || $('Create Research Run').first().json.id }}"
+            },
+            {
+              "keyName": "source_url",
+              "condition": "eq",
+              "keyValue": "={{ $('Research Request').first().json.canonicalUrl }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "VIp2iiJEEE7xS20g",
+          "name": "Supabase account 2"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "2cd84bf3-917f-47bc-97e9-3c55f4a75894",
+      "name": "Homepage Source Already Saved?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        3100,
+        200
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.id }}",
+              "operator": {
+                "type": "string",
+                "operation": "exists"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "06aad9eb-ec03-4bf0-b327-4fccc5ee2a87",
+      "name": "Save Homepage Source",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        3380,
+        320
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "create",
+        "authentication": "secretKey",
+        "tableId": "product_sources",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "product_id",
+              "fieldValue": "={{ $('Find Registered Product').first().json.id }}"
+            },
+            {
+              "fieldId": "research_run_id",
+              "fieldValue": "={{ $('Find Existing Research Run').first().json.id || $('Create Research Run').first().json.id }}"
+            },
+            {
+              "fieldId": "source_type",
+              "fieldValue": "website"
+            },
+            {
+              "fieldId": "source_url",
+              "fieldValue": "={{ $('Research Request').first().json.canonicalUrl }}"
+            },
+            {
+              "fieldId": "title",
+              "fieldValue": "={{ $('Extract Homepage').first().json.title || '' }}"
+            },
+            {
+              "fieldId": "description",
+              "fieldValue": "={{ $('Extract Homepage').first().json.description || '' }}"
+            },
+            {
+              "fieldId": "content_text",
+              "fieldValue": "={{ String($('Extract Homepage').first().json.pageText || '').slice(0, 30000) }}"
+            },
+            {
+              "fieldId": "metadata",
+              "fieldValue": "={{ { collection_method: 'http_request', http_status: $('Fetch Homepage').first().json.statusCode, collected_at: new Date().toISOString(), extracted_links: ( $('Extract Homepage').first().json.links || [] ).slice(0, 100) } }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "VIp2iiJEEE7xS20g",
+          "name": "Supabase account 2"
+        }
+      }
+    },
+    {
+      "id": "cdb1e3cf-63d6-4c95-9e90-c7e5d6fcb346",
+      "name": "Mark Research Running",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        3660,
+        200
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "authentication": "secretKey",
+        "tableId": "research_runs",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "status",
+              "fieldValue": "running"
+            },
+            {
+              "fieldId": "started_at",
+              "fieldValue": "={{ new Date().toISOString() }}"
+            }
+          ]
+        },
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Find Existing Research Run').first().json.id || $('Create Research Run').first().json.id }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "VIp2iiJEEE7xS20g",
+          "name": "Supabase account 2"
+        }
+      }
+    },
+    {
+      "id": "e631ede0-2073-4e8d-97dd-01fb933b68d2",
+      "name": "Homepage Collection Response",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        5060,
+        200
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "status",
+              "name": "status",
+              "value": "found",
+              "type": "string"
+            },
+            {
+              "id": "productId",
+              "name": "productId",
+              "value": "={{ $('Find Registered Product').first().json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "productName",
+              "name": "productName",
+              "value": "={{ $('Find Registered Product').first().json.name }}",
+              "type": "string"
+            },
+            {
+              "id": "canonicalUrl",
+              "name": "canonicalUrl",
+              "value": "={{ $('Research Request').first().json.canonicalUrl }}",
+              "type": "string"
+            },
+            {
+              "id": "chatId",
+              "name": "chatId",
+              "value": "={{ $('Research Request').first().json.chatId }}",
+              "type": "string"
+            },
+            {
+              "id": "senderId",
+              "name": "senderId",
+              "value": "={{ $('Research Request').first().json.senderId }}",
+              "type": "string"
+            },
+            {
+              "id": "researchRunId",
+              "name": "researchRunId",
+              "value": "={{ $('Find Existing Research Run').first().json.id || $('Create Research Run').first().json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "researchRunStatus",
+              "name": "researchRunStatus",
+              "value": "={{ $('Execute WF-03 Claim Extraction').first().json.status || 'unknown' }}",
+              "type": "string"
+            },
+            {
+              "id": "researchRunReused",
+              "name": "researchRunReused",
+              "value": "={{ !!$('Find Existing Research Run').first().json.id }}",
+              "type": "boolean"
+            },
+            {
+              "id": "homepageCollected",
+              "name": "homepageCollected",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "sourceTitle",
+              "name": "sourceTitle",
+              "value": "={{ $('Extract Homepage').first().json.title || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "internal-pages-discovered",
+              "name": "internalPagesDiscovered",
+              "value": "={{ $('Discover Internal Pages').first().json.discoveredCount }}",
+              "type": "number"
+            },
+            {
+              "id": "internal-attempted",
+              "name": "internalPagesAttempted",
+              "value": "={{ $('Build Internal Collection Summary').isExecuted ? $('Build Internal Collection Summary').first().json.attemptedCount : 0 }}",
+              "type": "number"
+            },
+            {
+              "id": "internal-collected",
+              "name": "internalPagesCollected",
+              "value": "={{ $('Build Internal Collection Summary').isExecuted ? $('Build Internal Collection Summary').first().json.collectedCount : 0 }}",
+              "type": "number"
+            },
+            {
+              "id": "internal-failed",
+              "name": "internalPagesFailed",
+              "value": "={{ $('Build Internal Collection Summary').isExecuted ? $('Build Internal Collection Summary').first().json.failedCount : 0 }}",
+              "type": "number"
+            },
+            {
+              "id": "internal-skipped",
+              "name": "internalPagesSkipped",
+              "value": "={{ $('Build Internal Collection Summary').isExecuted ? $('Build Internal Collection Summary').first().json.skippedCount : 0 }}",
+              "type": "number"
+            },
+            {
+              "id": "internal-duplicate",
+              "name": "internalPagesAlreadySaved",
+              "value": "={{ $('Build Internal Collection Summary').isExecuted ? $('Build Internal Collection Summary').first().json.alreadySavedCount : 0 }}",
+              "type": "number"
+            },
+            {
+              "id": "claim-status",
+              "name": "claimExtractionStatus",
+              "value": "={{ $('Execute WF-03 Claim Extraction').first().json.status || 'unknown' }}",
+              "type": "string"
+            },
+            {
+              "id": "claim-summary",
+              "name": "claimExtractionSummary",
+              "value": "={{ $('Execute WF-03 Claim Extraction').first().json.claimExtractionSummary || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "verification-status",
+              "name": "verificationStatus",
+              "value": "={{ $('Execute WF-03 Claim Extraction').first().json.verificationStatus || 'unknown' }}",
+              "type": "string"
+            },
+            {
+              "id": "verification-summary",
+              "name": "verificationSummary",
+              "value": "={{ $('Execute WF-03 Claim Extraction').first().json.verificationSummary || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "verification-counts",
+              "name": "verificationCounts",
+              "value": "={{ $('Execute WF-03 Claim Extraction').first().json.verificationCounts || {} }}",
+              "type": "object"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "dd60d618-8863-4a5c-9e69-5a185d383cd4",
+      "name": "Mark Research Failed",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2540,
+        480
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "authentication": "secretKey",
+        "tableId": "research_runs",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "status",
+              "fieldValue": "failed"
+            },
+            {
+              "fieldId": "error_message",
+              "fieldValue": "={{ 'Homepage request returned HTTP ' + ($('Fetch Homepage').first().json.statusCode ?? 'unknown') }}"
+            }
+          ]
+        },
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Find Existing Research Run').first().json.id || $('Create Research Run').first().json.id }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "VIp2iiJEEE7xS20g",
+          "name": "Supabase account 2"
+        }
+      }
+    },
+    {
+      "id": "7c5d082a-91a1-4f93-a716-7afa78eef7ac",
+      "name": "Homepage Collection Failed Response",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2820,
+        480
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "status",
+              "name": "status",
+              "value": "found",
+              "type": "string"
+            },
+            {
+              "id": "productId",
+              "name": "productId",
+              "value": "={{ $('Find Registered Product').first().json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "productName",
+              "name": "productName",
+              "value": "={{ $('Find Registered Product').first().json.name }}",
+              "type": "string"
+            },
+            {
+              "id": "canonicalUrl",
+              "name": "canonicalUrl",
+              "value": "={{ $('Research Request').first().json.canonicalUrl }}",
+              "type": "string"
+            },
+            {
+              "id": "chatId",
+              "name": "chatId",
+              "value": "={{ $('Research Request').first().json.chatId }}",
+              "type": "string"
+            },
+            {
+              "id": "senderId",
+              "name": "senderId",
+              "value": "={{ $('Research Request').first().json.senderId }}",
+              "type": "string"
+            },
+            {
+              "id": "researchRunId",
+              "name": "researchRunId",
+              "value": "={{ $('Find Existing Research Run').first().json.id || $('Create Research Run').first().json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "researchRunStatus",
+              "name": "researchRunStatus",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "researchRunReused",
+              "name": "researchRunReused",
+              "value": "={{ !!$('Find Existing Research Run').first().json.id }}",
+              "type": "boolean"
+            },
+            {
+              "id": "homepageCollected",
+              "name": "homepageCollected",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "collectionError",
+              "name": "collectionError",
+              "value": "={{ 'Homepage request returned HTTP ' + $('Fetch Homepage').first().json.statusCode }}",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "685ff686-16eb-4b5d-bbd9-0096f872d5df",
+      "name": "Fetch robots.txt",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3940,
+        200
+      ],
+      "parameters": {
+        "method": "GET",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "OpenMontageResearchBot/1.0 (+public website research)"
+            },
+            {
+              "name": "Accept",
+              "value": "text/plain,*/*"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000,
+          "redirect": {
+            "redirect": {
+              "followRedirects": false,
+              "maxRedirects": 0
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "responseFormat": "text",
+              "neverError": true,
+              "outputPropertyName": "body"
+            }
+          }
+        },
+        "url": "={{ $('Research Request').first().json.canonicalUrl.replace(/^(https?:\\/\\/[^/]+).*$/i, '$1') + '/robots.txt' }}"
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000
+    },
+    {
+      "id": "11c36a82-a78c-4a9c-a27c-c4e414ce2a40",
+      "name": "Fetch sitemap.xml",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4220,
+        200
+      ],
+      "parameters": {
+        "method": "GET",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "OpenMontageResearchBot/1.0 (+public website research)"
+            },
+            {
+              "name": "Accept",
+              "value": "application/xml,text/xml,text/plain,*/*"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000,
+          "redirect": {
+            "redirect": {
+              "followRedirects": false,
+              "maxRedirects": 0
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "responseFormat": "text",
+              "neverError": true,
+              "outputPropertyName": "body"
+            }
+          }
+        },
+        "url": "={{ $('Research Request').first().json.canonicalUrl.replace(/^(https?:\\/\\/[^/]+).*$/i, '$1') + '/sitemap.xml' }}"
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000
+    },
+    {
+      "id": "4b6a8c2e-35d9-49ae-b60e-92d8388b6ac1",
+      "name": "Discover Internal Pages",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4500,
+        200
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const request = $('Research Request').first().json;\nconst homepage = $('Fetch Homepage').first().json;\nconst robotsResponse = $('Fetch robots.txt').first().json;\nconst sitemapResponse = $('Fetch sitemap.xml').first().json;\nconst canonical = String(request.canonicalUrl || '').trim();\nconst baseMatch = canonical.match(/^(https?):\\/\\/([^/?#]+)(?:\\/[^?#]*)?/i);\nif (!baseMatch) throw new Error('Research request contains an invalid canonical URL');\nconst baseProtocol = baseMatch[1].toLowerCase();\nconst baseAuthority = baseMatch[2].toLowerCase();\nconst origin = baseProtocol + '://' + baseAuthority;\nfunction parseSameOrigin(raw) {\n  if (!raw) return null;\n  let value = String(raw).replace(/&amp;/g, '&').trim();\n  if (!value) return null;\n  if (value.startsWith('//')) value = baseProtocol + ':' + value;\n  else if (value.startsWith('/')) value = origin + value;\n  else if (!/^https?:\\/\\//i.test(value)) value = origin + '/' + value.replace(/^\\.\\//, '');\n  const match = value.match(/^(https?):\\/\\/([^/?#]+)([^?#]*)?(?:\\?[^#]*)?(?:#.*)?$/i);\n  if (!match) return null;\n  const protocol = match[1].toLowerCase();\n  const authority = match[2].toLowerCase();\n  if (protocol !== baseProtocol || authority !== baseAuthority) return null;\n  let path = match[3] || '/';\n  const parts = [];\n  for (const part of path.split('/')) {\n    if (!part || part === '.') continue;\n    if (part === '..') parts.pop();\n    else parts.push(part);\n  }\n  path = '/' + parts.join('/');\n  return { url: origin + path, path };\n}\nconst robotsText = String(robotsResponse.body || '');\nconst sitemapText = String(sitemapResponse.body || '');\nconst disallow = [];\nlet inWildcardAgent = false;\nfor (const rawLine of robotsText.split(/\\r?\\n/)) {\n  const line = rawLine.replace(/#.*$/, '').trim();\n  if (!line) continue;\n  const match = line.match(/^([^:]+):\\s*(.*)$/);\n  if (!match) continue;\n  const key = match[1].trim().toLowerCase();\n  const value = match[2].trim();\n  if (key === 'user-agent') inWildcardAgent = value === '*';\n  else if (key === 'disallow' && inWildcardAgent && value) disallow.push(value);\n}\nconst sitemapIndexUrls = [];\nconst discovered = new Map();\nconst excludedExtensions = /\\.(?:css|js|mjs|map|png|jpe?g|gif|webp|svg|ico|woff2?|ttf|eot|pdf|zip|mp[34]|webm|xml)$/i;\nconst excludedPaths = /^\\/(?:api|_next|assets?|static|cdn-cgi|auth|login|logout|signup|register|dashboard|admin)(?:\\/|$)/i;\nfunction addCandidate(raw) {\n  const candidate = parseSameOrigin(raw);\n  if (!candidate) return;\n  if (candidate.path === '/' || excludedExtensions.test(candidate.path) || excludedPaths.test(candidate.path)) return;\n  if (disallow.some(rule => candidate.path.startsWith(rule))) return;\n  if (!discovered.has(candidate.url)) discovered.set(candidate.url, candidate.path);\n}\nconst homepageHtml = String(homepage.body || '');\nfor (const match of homepageHtml.matchAll(/\\bhref\\s*=\\s*[\"']([^\"'#]+)[\"']/gi)) addCandidate(match[1]);\nconst isSitemapIndex = /<sitemapindex\\b/i.test(sitemapText);\nconst locs = [...sitemapText.matchAll(/<loc>\\s*([^<]+?)\\s*<\\/loc>/gi)].map(m => m[1].trim());\nif (isSitemapIndex) {\n  for (const loc of locs) {\n    const sitemap = parseSameOrigin(loc);\n    if (sitemap && /\\.xml$/i.test(sitemap.path)) sitemapIndexUrls.push(sitemap.url);\n  }\n} else {\n  for (const loc of locs) addCandidate(loc);\n}\nconst priority = /pricing|price|features?|product|about|how-it-works|integrations?|docs?|documentation|faq|security|use-cases?/i;\nconst urls = [...discovered.entries()].sort((a,b) => Number(priority.test(b[1])) - Number(priority.test(a[1])) || a[1].length - b[1].length).slice(0,10).map(([url]) => url);\nreturn [{json:{productId:$('Find Registered Product').first().json.id,researchRunId:$('Find Existing Research Run').first().json.id || $('Create Research Run').first().json.id,canonicalUrl:request.canonicalUrl,discoveredUrls:urls,discoveredCount:urls.length,sitemapIndexUrls:[...new Set(sitemapIndexUrls)].slice(0,5),robotsDisallowRules:disallow.slice(0,50),discoveryMethod:'homepage_links_and_root_sitemap',discoveredAt:new Date().toISOString(),robotsHttpStatus:robotsResponse.statusCode ?? null,sitemapHttpStatus:sitemapResponse.statusCode ?? null}}];"
+      }
+    },
+    {
+      "id": "4d3813eb-d00a-41cd-b55f-b1886224b4e2",
+      "name": "Persist Internal Discovery",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        4780,
+        200
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "authentication": "secretKey",
+        "tableId": "research_runs",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "metadata",
+              "fieldValue": "={{ { ...($('Find Existing Research Run').first().json.metadata || $('Create Research Run').first().json.metadata || {}), internal_discovery: { urls: $json.discoveredUrls, discovered_count: $json.discoveredCount, sitemap_index_urls: $json.sitemapIndexUrls, robots_disallow_rules: $json.robotsDisallowRules, method: $json.discoveryMethod, discovered_at: $json.discoveredAt, robots_http_status: $json.robotsHttpStatus, sitemap_http_status: $json.sitemapHttpStatus } } }}"
+            }
+          ]
+        },
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $json.researchRunId }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "VIp2iiJEEE7xS20g",
+          "name": "Supabase account 2"
+        }
+      }
+    },
+    {
+      "id": "ff51249d-1d3e-42c3-b6fa-e22d8e0f4bd3",
+      "name": "Prepare Internal Page Items",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5340,
+        200
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const d = $('Discover Internal Pages').first().json;\nconst r = $('Research Request').first().json;\nconst m = String(r.canonicalUrl || '').match(/^(https?):\\/\\/([^/?#]+)/i);\nif (!m) throw new Error('Invalid canonical URL');\nconst origin = m[1].toLowerCase() + '://' + m[2].toLowerCase();\nconst blocked = Array.isArray(d.robotsDisallowRules) ? d.robotsDisallowRules : [];\nconst out = [];\nfor (const raw of (Array.isArray(d.discoveredUrls) ? d.discoveredUrls : []).slice(0,10)) {\n const u = String(raw || '').trim();\n const x = u.match(/^(https?):\\/\\/([^/?#]+)([^?#]*)(?:\\?[^#]*)?(?:#.*)?$/i);\n if (!x) continue;\n const o = x[1].toLowerCase() + '://' + x[2].toLowerCase();\n const p = x[3] || '/';\n if (o !== origin || p === '/' || /\\.(css|js|png|jpe?g|gif|svg|ico|woff2?|ttf|pdf|zip|mp[34]|webm|xml)$/i.test(p)) continue;\n if (/^\\/(api|_next|assets?|static|auth|login|logout|signup|register|dashboard|admin)(\\/|$)/i.test(p) || blocked.some(rule => p.startsWith(rule)) || /[?#]/.test(u)) continue;\n if (!out.some(v => v.sourceUrl === u)) out.push({sourceUrl:u,productId:d.productId,researchRunId:d.researchRunId});\n}\nconst reason = (Array.isArray(d.discoveredUrls) && d.discoveredUrls.length === 0) ? 'no_internal_urls_discovered' : 'no_candidates_passed_revalidation';\nreturn out.length ? out.map(json => ({json})) : [{json:{noValidPages:true,reason}}];"
+      }
+    },
+    {
+      "id": "38d8dbc3-4e2b-4876-b400-2705ed83f1af",
+      "name": "Has Valid Prepared URLs?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        5620,
+        200
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.sourceUrl }}",
+              "operator": {
+                "type": "string",
+                "operation": "exists"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "cf64eea9-1b3c-4f0c-80a7-703a9f55478d",
+      "name": "Fetch Internal Page",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        5900,
+        100
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.sourceUrl }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "OpenMontageResearchBot/1.0 (+public website research)"
+            },
+            {
+              "name": "Accept",
+              "value": "text/html,application/xhtml+xml"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 12000,
+          "redirect": {
+            "redirect": {
+              "followRedirects": false,
+              "maxRedirects": 0
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "responseFormat": "text",
+              "neverError": true,
+              "outputPropertyName": "body"
+            }
+          }
+        }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000
+    },
+    {
+      "id": "856e12e7-cd4f-4fd0-b54c-106fc8588f1a",
+      "name": "Normalize Internal Page",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6180,
+        100
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const items = $input.all();\nreturn items.map((item,i) => {\n const d=item.json||{};\n const src=$('Prepare Internal Page Items').all()[i]?.json||{};\n const h=d.headers||{};\n const ct=String(h['content-type']||h['Content-Type']||'').toLowerCase();\n const sc=Number(d.statusCode||0);\n const html=typeof d.body==='string'?d.body:'';\n let status='failed',error='',title='',description='',contentText='';\n if(d.error||(!sc&&d.message)){error=String(d.error?.message||d.message||'HTTP request failed').slice(0,500);}\n else if(sc>=300&&sc<400){status='skipped';error='Redirect not followed; target requires validation';}\n else if(sc<200||sc>=300){error='HTTP '+(sc||'unknown');}\n else if(!/(text\\/html|application\\/xhtml\\+xml)/i.test(ct)){status='skipped';error='Non-HTML content type: '+(ct||'missing');}\n else {\n  const dec=s=>String(s||'').replace(/&nbsp;/gi,' ').replace(/&amp;/gi,'&').replace(/&quot;/gi,'\"').replace(/&#39;|&apos;/gi,\"'\").replace(/&lt;/gi,'<').replace(/&gt;/gi,'>');\n  const t=html.match(/<title[^>]*>([\\s\\S]*?)<\\/title>/i);\n  title=dec((t?.[1]||'').replace(/<[^>]+>/g,' ')).replace(/\\s+/g,' ').trim().slice(0,500);\n  const md=html.match(/<meta[^>]+(?:name|property)=[\"'](?:description|og:description)[\"'][^>]+content=[\"']([^\"']*)[\"']/i)||html.match(/<meta[^>]+content=[\"']([^\"']*)[\"'][^>]+(?:name|property)=[\"'](?:description|og:description)[\"']/i);\n  description=dec(md?.[1]||'').replace(/\\s+/g,' ').trim().slice(0,2000);\n  contentText=dec(html.replace(/<!--[\\s\\S]*?-->/g,' ').replace(/<(script|style|noscript|svg|template)\\b[^>]*>[\\s\\S]*?<\\/\\1>/gi,' ').replace(/<\\/(p|div|section|article|li|h[1-6]|br|tr)>/gi,'\\n').replace(/<[^>]+>/g,' ')).replace(/[\\t\\r ]+/g,' ').replace(/\\n\\s*\\n+/g,'\\n').trim().slice(0,30000);\n  if(contentText){status='ready_to_save';}else{status='skipped';error='No extractable HTML text';}\n }\n return {json:{...src,statusCode:sc,contentType:ct,pageStatus:status,error,title,description,contentText,mimeType:ct||null}};\n});"
+      }
+    },
+    {
+      "id": "baf24ce0-c3e3-467e-b534-a5217e5e161a",
+      "name": "Internal Page HTML Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        6460,
+        100
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.pageStatus }}",
+              "rightValue": "ready_to_save",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "f77d5edb-0bb0-45da-b819-79f555d26138",
+      "name": "Save Internal Page Source",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        6740,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "create",
+        "authentication": "secretKey",
+        "tableId": "product_sources",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "product_id",
+              "fieldValue": "={{ $json.productId }}"
+            },
+            {
+              "fieldId": "research_run_id",
+              "fieldValue": "={{ $json.researchRunId }}"
+            },
+            {
+              "fieldId": "source_type",
+              "fieldValue": "website"
+            },
+            {
+              "fieldId": "source_url",
+              "fieldValue": "={{ $json.sourceUrl }}"
+            },
+            {
+              "fieldId": "title",
+              "fieldValue": "={{ $json.title }}"
+            },
+            {
+              "fieldId": "description",
+              "fieldValue": "={{ $json.description }}"
+            },
+            {
+              "fieldId": "content_text",
+              "fieldValue": "={{ $json.contentText }}"
+            },
+            {
+              "fieldId": "mime_type",
+              "fieldValue": "={{ $json.mimeType }}"
+            },
+            {
+              "fieldId": "metadata",
+              "fieldValue": "={{ { collection_method: 'http_request', http_status: $json.statusCode, content_type: $json.contentType, collected_at: new Date().toISOString(), text_truncated_at: 30000 } }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "VIp2iiJEEE7xS20g",
+          "name": "Supabase account 2"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "397df107-e6a7-4769-a8a2-35f5f6673084",
+      "name": "Mark Internal Page Saved",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        7020,
+        0
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "src",
+              "name": "sourceUrl",
+              "value": "={{ $('Normalize Internal Page').item.json.sourceUrl }}",
+              "type": "string"
+            },
+            {
+              "id": "status",
+              "name": "pageStatus",
+              "value": "={{ $json.error ? (String($json.error.message || $json.error).toLowerCase().includes('duplicate key') ? 'already_saved' : 'failed') : 'collected' }}",
+              "type": "string"
+            },
+            {
+              "id": "err",
+              "name": "error",
+              "value": "={{ $json.error ? String($json.error.message || $json.error).slice(0,500) : '' }}",
+              "type": "string"
+            },
+            {
+              "id": "http",
+              "name": "statusCode",
+              "value": "={{ $('Normalize Internal Page').item.json.statusCode }}",
+              "type": "number"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "a8c817e3-718a-4a1d-b75d-d3fb1dfca340",
+      "name": "Mark Internal Page Skipped",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        6740,
+        200
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "src2",
+              "name": "sourceUrl",
+              "value": "={{ $json.sourceUrl }}",
+              "type": "string"
+            },
+            {
+              "id": "status2",
+              "name": "pageStatus",
+              "value": "={{ $json.pageStatus }}",
+              "type": "string"
+            },
+            {
+              "id": "err2",
+              "name": "error",
+              "value": "={{ $json.error }}",
+              "type": "string"
+            },
+            {
+              "id": "http2",
+              "name": "statusCode",
+              "value": "={{ $json.statusCode }}",
+              "type": "number"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "6572007b-2a40-4235-afd9-21b3009d21ce",
+      "name": "Merge Internal Page Results",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        7300,
+        100
+      ],
+      "parameters": {
+        "mode": "append",
+        "numberInputs": 2
+      }
+    },
+    {
+      "id": "263bbd4a-f3f3-4d54-8237-4103743fbdaf",
+      "name": "Build Internal Collection Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        7580,
+        100
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const pages=$input.all().map(x=>({source_url:x.json.sourceUrl||'',status:x.json.pageStatus||'failed',http_status:x.json.statusCode||null,error:x.json.error||null}));\nconst n=s=>pages.filter(p=>p.status===s).length;\nreturn [{json:{attemptedCount:pages.length,collectedCount:n('collected'),failedCount:n('failed'),skippedCount:n('skipped'),alreadySavedCount:n('already_saved'),pages,completedAt:new Date().toISOString()}}];"
+      }
+    },
+    {
+      "id": "c5e0213a-88dc-4c85-a23b-2943f40d1f0f",
+      "name": "No Internal Pages Summary",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        5900,
+        420
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a",
+              "name": "attemptedCount",
+              "value": 0,
+              "type": "number"
+            },
+            {
+              "id": "b",
+              "name": "collectedCount",
+              "value": 0,
+              "type": "number"
+            },
+            {
+              "id": "c",
+              "name": "failedCount",
+              "value": 0,
+              "type": "number"
+            },
+            {
+              "id": "d",
+              "name": "skippedCount",
+              "value": 0,
+              "type": "number"
+            },
+            {
+              "id": "e",
+              "name": "alreadySavedCount",
+              "value": 0,
+              "type": "number"
+            },
+            {
+              "id": "f",
+              "name": "pages",
+              "value": "={{ [] }}",
+              "type": "array"
+            },
+            {
+              "id": "g",
+              "name": "skipReason",
+              "value": "={{ $json.reason || 'no_internal_urls_discovered' }}",
+              "type": "string"
+            },
+            {
+              "id": "h",
+              "name": "completedAt",
+              "value": "={{ new Date().toISOString() }}",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "bc035f92-41cf-4236-80b2-791ce653d8c5",
+      "name": "Persist Internal Collection",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        7860,
+        100
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "authentication": "secretKey",
+        "tableId": "research_runs",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "metadata",
+              "fieldValue": "={{ { ...($('Find Existing Research Run').first().json.metadata || $('Create Research Run').first().json.metadata || {}), internal_discovery: { urls: $('Discover Internal Pages').first().json.discoveredUrls, discovered_count: $('Discover Internal Pages').first().json.discoveredCount, sitemap_index_urls: $('Discover Internal Pages').first().json.sitemapIndexUrls, robots_disallow_rules: $('Discover Internal Pages').first().json.robotsDisallowRules, method: $('Discover Internal Pages').first().json.discoveryMethod, discovered_at: $('Discover Internal Pages').first().json.discoveredAt, robots_http_status: $('Discover Internal Pages').first().json.robotsHttpStatus, sitemap_http_status: $('Discover Internal Pages').first().json.sitemapHttpStatus }, internal_collection: { attempted_count: $json.attemptedCount, collected_count: $json.collectedCount, failed_count: $json.failedCount, skipped_count: $json.skippedCount, already_saved_count: $json.alreadySavedCount, pages: $json.pages, skip_reason: $json.skipReason || null, completed_at: $json.completedAt } } }}"
+            }
+          ]
+        },
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Discover Internal Pages').first().json.researchRunId }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "VIp2iiJEEE7xS20g",
+          "name": "Supabase account 2"
+        }
+      }
+    },
+    {
+      "id": "407a0e67-1342-4afa-8a52-c4dc6e9719fd",
+      "name": "Execute WF-03 Claim Extraction",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        8120,
+        100
+      ],
+      "parameters": {
+        "mode": "once",
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "5Hct9ez35TqJsucK"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "researchRunId": "={{ $(\"Discover Internal Pages\").first().json.researchRunId }}",
+            "productId": "={{ $(\"Find Registered Product\").first().json.id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "researchRunId",
+              "displayName": "researchRunId",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "productId",
+              "displayName": "productId",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Research Request": {
+      "main": [
+        [
+          {
+            "node": "Find Registered Product",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Registered Product": {
+      "main": [
+        [
+          {
+            "node": "Product Registered?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Product Registered?": {
+      "main": [
+        [
+          {
+            "node": "Find Existing Research Run",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return Product Not Found",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Existing Research Run": {
+      "main": [
+        [
+          {
+            "node": "Research Run Already Exists?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Research Run Already Exists?": {
+      "main": [
+        [
+          {
+            "node": "Return Existing Research Run",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create Research Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Research Run": {
+      "main": [
+        [
+          {
+            "node": "Return Product Found",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Homepage": {
+      "main": [
+        [
+          {
+            "node": "Homepage HTTP Success?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Homepage HTTP Success?": {
+      "main": [
+        [
+          {
+            "node": "Extract Homepage",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark Research Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Homepage": {
+      "main": [
+        [
+          {
+            "node": "Find Existing Homepage Source",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Existing Homepage Source": {
+      "main": [
+        [
+          {
+            "node": "Homepage Source Already Saved?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Homepage Source Already Saved?": {
+      "main": [
+        [
+          {
+            "node": "Mark Research Running",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Save Homepage Source",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Homepage Source": {
+      "main": [
+        [
+          {
+            "node": "Mark Research Running",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Research Failed": {
+      "main": [
+        [
+          {
+            "node": "Homepage Collection Failed Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Research Running": {
+      "main": [
+        [
+          {
+            "node": "Fetch robots.txt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch robots.txt": {
+      "main": [
+        [
+          {
+            "node": "Fetch sitemap.xml",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch sitemap.xml": {
+      "main": [
+        [
+          {
+            "node": "Discover Internal Pages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Discover Internal Pages": {
+      "main": [
+        [
+          {
+            "node": "Persist Internal Discovery",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Persist Internal Discovery": {
+      "main": [
+        [
+          {
+            "node": "Prepare Internal Page Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Internal Page Items": {
+      "main": [
+        [
+          {
+            "node": "Has Valid Prepared URLs?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Valid Prepared URLs?": {
+      "main": [
+        [
+          {
+            "node": "Fetch Internal Page",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Internal Pages Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Internal Page": {
+      "main": [
+        [
+          {
+            "node": "Normalize Internal Page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Internal Page": {
+      "main": [
+        [
+          {
+            "node": "Internal Page HTML Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Internal Page HTML Valid?": {
+      "main": [
+        [
+          {
+            "node": "Save Internal Page Source",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark Internal Page Skipped",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Internal Page Source": {
+      "main": [
+        [
+          {
+            "node": "Mark Internal Page Saved",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Internal Page Saved": {
+      "main": [
+        [
+          {
+            "node": "Merge Internal Page Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Internal Page Skipped": {
+      "main": [
+        [
+          {
+            "node": "Merge Internal Page Results",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Internal Page Results": {
+      "main": [
+        [
+          {
+            "node": "Build Internal Collection Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Internal Collection Summary": {
+      "main": [
+        [
+          {
+            "node": "Persist Internal Collection",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No Internal Pages Summary": {
+      "main": [
+        [
+          {
+            "node": "Persist Internal Collection",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Persist Internal Collection": {
+      "main": [
+        [
+          {
+            "node": "Execute WF-03 Claim Extraction",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute WF-03 Claim Extraction": {
+      "main": [
+        [
+          {
+            "node": "Homepage Collection Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Return Product Found": {
+      "main": [
+        [
+          {
+            "node": "Fetch Homepage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Return Existing Research Run": {
+      "main": [
+        [
+          {
+            "node": "Fetch Homepage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "saveExecutionProgress": true,
+    "saveDataErrorExecution": "all"
+  }
+}
