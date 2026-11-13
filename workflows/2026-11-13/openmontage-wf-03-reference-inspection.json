@@ -1,0 +1,84 @@
+{
+  "name": "OpenMontage - WF-03 Reference Inspection",
+  "nodes": [
+    {
+      "id": "c9c527dc-c3dc-4d98-926e-29894a6515ca",
+      "name": "Start Reference Inspection",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "f7286364-24e0-484f-b20c-f20d43ce5f8e",
+      "name": "Read Product References",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        520,
+        180
+      ],
+      "parameters": {
+        "authentication": "secretKey",
+        "resource": "row",
+        "operation": "getAll",
+        "tableId": "products",
+        "returnAll": true
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "VIp2iiJEEE7xS20g",
+          "name": "Supabase account 2"
+        }
+      }
+    },
+    {
+      "id": "8500f877-c702-4070-96f8-b08ee38cc357",
+      "name": "Read Research Run References",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        520,
+        420
+      ],
+      "parameters": {
+        "authentication": "secretKey",
+        "resource": "row",
+        "operation": "getAll",
+        "tableId": "research_runs",
+        "returnAll": true
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "VIp2iiJEEE7xS20g",
+          "name": "Supabase account 2"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Start Reference Inspection": {
+      "main": [
+        [
+          {
+            "node": "Read Product References",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Read Research Run References",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  }
+}
