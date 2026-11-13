@@ -1,0 +1,56 @@
+{
+  "name": "OpenMontage - WF-03 Ledger Inspection",
+  "nodes": [
+    {
+      "id": "82383392-7b3b-4c02-8c18-59e854b336a1",
+      "name": "Start Schema Inspection",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "58f06390-98f2-4bfd-b43c-02abbf34b52c",
+      "name": "Read Research Batch Ledger",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        520,
+        300
+      ],
+      "parameters": {
+        "authentication": "secretKey",
+        "resource": "row",
+        "operation": "getAll",
+        "tableId": "research_batches",
+        "returnAll": true
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "VIp2iiJEEE7xS20g",
+          "name": "Supabase account 2"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Start Schema Inspection": {
+      "main": [
+        [
+          {
+            "node": "Read Research Batch Ledger",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  }
+}
