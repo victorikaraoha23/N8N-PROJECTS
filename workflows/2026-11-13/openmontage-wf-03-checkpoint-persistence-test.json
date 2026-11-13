@@ -1,0 +1,400 @@
+{
+  "name": "OpenMontage - WF-03 Checkpoint Persistence Test",
+  "nodes": [
+    {
+      "id": "ccd86dbf-6c99-4ab5-a32c-3900f7f13b83",
+      "name": "Start Isolated Checkpoint Test",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "d925a53a-6f32-441b-b680-db81aed8a973",
+      "name": "Create Isolated Test Research Run",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        480,
+        300
+      ],
+      "parameters": {
+        "authentication": "secretKey",
+        "resource": "row",
+        "operation": "create",
+        "tableId": "research_runs",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "product_id",
+              "fieldValue": "a1c196da-65de-451b-89fd-90f5d9b9623e"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "pending"
+            },
+            {
+              "fieldId": "provider",
+              "fieldValue": "test-only"
+            },
+            {
+              "fieldId": "model",
+              "fieldValue": "synthetic-checkpoint-test"
+            },
+            {
+              "fieldId": "idempotency_key",
+              "fieldValue": "={{ \"openmontage-wf03-checkpoint-test:\" + $execution.id }}"
+            },
+            {
+              "fieldId": "metadata",
+              "fieldValue": "={{ ({ test_only: true, purpose: \"isolated checkpoint persistence validation\" }) }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "VIp2iiJEEE7xS20g",
+          "name": "Supabase account 2"
+        }
+      }
+    },
+    {
+      "id": "059b44ce-4f61-4c4b-9e60-fff68b8852db",
+      "name": "Create Isolated Test Batch",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        740,
+        300
+      ],
+      "parameters": {
+        "authentication": "secretKey",
+        "resource": "row",
+        "operation": "create",
+        "tableId": "research_batches",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "research_run_id",
+              "fieldValue": "={{ $(\"Create Isolated Test Research Run\").item.json.id }}"
+            },
+            {
+              "fieldId": "batch_id",
+              "fieldValue": "om-test-batch-0001"
+            },
+            {
+              "fieldId": "batch_index",
+              "fieldValue": "={{ 1 }}"
+            },
+            {
+              "fieldId": "batch_count",
+              "fieldValue": "={{ 1 }}"
+            },
+            {
+              "fieldId": "candidate_ids",
+              "fieldValue": "={{ [\"om-test-candidate-1\"] }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "pending"
+            },
+            {
+              "fieldId": "primary_attempts",
+              "fieldValue": "={{ 1 }}"
+            },
+            {
+              "fieldId": "recovery_attempts",
+              "fieldValue": "={{ 0 }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "VIp2iiJEEE7xS20g",
+          "name": "Supabase account 2"
+        }
+      }
+    },
+    {
+      "id": "aad10940-0c6e-460b-89fc-5057e615d21b",
+      "name": "Save Synthetic NVIDIA Checkpoint",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1000,
+        300
+      ],
+      "parameters": {
+        "authentication": "secretKey",
+        "resource": "row",
+        "operation": "update",
+        "tableId": "research_batches",
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "research_run_id",
+              "condition": "eq",
+              "keyValue": "={{ $(\"Create Isolated Test Research Run\").item.json.id }}"
+            },
+            {
+              "keyName": "batch_id",
+              "condition": "eq",
+              "keyValue": "om-test-batch-0001"
+            }
+          ]
+        },
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "status",
+              "fieldValue": "completed"
+            },
+            {
+              "fieldId": "provider_used",
+              "fieldValue": "nvidia"
+            },
+            {
+              "fieldId": "result",
+              "fieldValue": "={{ ({ researchRunId: $(\"Create Isolated Test Research Run\").item.json.id, batchId: \"om-test-batch-0001\", batchIndex: 1, batchCount: 1, expectedCandidateIds: [\"om-test-candidate-1\"], classifiedIds: [\"om-test-candidate-1\"], claims: [], providerPath: \"nvidia\" }) }}"
+            },
+            {
+              "fieldId": "recovery_attempts",
+              "fieldValue": "={{ 1 }}"
+            },
+            {
+              "fieldId": "completed_at",
+              "fieldValue": "={{ $now.toISO() }}"
+            },
+            {
+              "fieldId": "updated_at",
+              "fieldValue": "={{ $now.toISO() }}"
+            },
+            {
+              "fieldId": "error_message",
+              "fieldValue": ""
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "VIp2iiJEEE7xS20g",
+          "name": "Supabase account 2"
+        }
+      }
+    },
+    {
+      "id": "ab235d42-26d1-474f-8562-27b6bf1dae1e",
+      "name": "Read Back Synthetic Checkpoint",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1260,
+        300
+      ],
+      "parameters": {
+        "authentication": "secretKey",
+        "resource": "row",
+        "operation": "getAll",
+        "tableId": "research_batches",
+        "returnAll": true,
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "research_run_id",
+              "condition": "eq",
+              "keyValue": "={{ $(\"Create Isolated Test Research Run\").item.json.id }}"
+            },
+            {
+              "keyName": "batch_id",
+              "condition": "eq",
+              "keyValue": "om-test-batch-0001"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "VIp2iiJEEE7xS20g",
+          "name": "Supabase account 2"
+        }
+      }
+    },
+    {
+      "id": "e1a5104d-e887-4c69-bd38-46be09ce3f3f",
+      "name": "Validate Checkpoint Readback",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1520,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const rows=$input.all().map(x=>x.json||{}); if(rows.length!==1) throw new Error('Expected exactly one test checkpoint row; found '+rows.length); const row=rows[0]; const result=typeof row.result==='string'?JSON.parse(row.result):row.result; const checks={status:row.status==='completed',provider:row.provider_used==='nvidia',recoveryAttempts:Number(row.recovery_attempts)===1,resultObject:!!result&&typeof result==='object',batchId:result?.batchId==='om-test-batch-0001',candidateIds:JSON.stringify(result?.expectedCandidateIds)===JSON.stringify(['om-test-candidate-1'])&&JSON.stringify(result?.classifiedIds)===JSON.stringify(['om-test-candidate-1']),runId:result?.researchRunId===$('Create Isolated Test Research Run').item.json.id}; const failed=Object.entries(checks).filter(([k,v])=>!v).map(([k])=>k); if(failed.length) throw new Error('Checkpoint persistence checks failed: '+failed.join(', ')); return [{json:{testPassed:true,checks,rowId:row.id,runId:row.research_run_id,batchId:row.batch_id}}];"
+      }
+    },
+    {
+      "id": "598e01d9-fd4a-41f0-bbad-7e33657b0c1b",
+      "name": "Delete Isolated Test Batch",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1780,
+        300
+      ],
+      "parameters": {
+        "authentication": "secretKey",
+        "resource": "row",
+        "operation": "delete",
+        "tableId": "research_batches",
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $(\"Create Isolated Test Batch\").item.json.id }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "VIp2iiJEEE7xS20g",
+          "name": "Supabase account 2"
+        }
+      }
+    },
+    {
+      "id": "af548f0e-c1e9-4fdb-8abc-7afec795a0fd",
+      "name": "Delete Isolated Test Research Run",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2040,
+        300
+      ],
+      "parameters": {
+        "authentication": "secretKey",
+        "resource": "row",
+        "operation": "delete",
+        "tableId": "research_runs",
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $(\"Create Isolated Test Research Run\").item.json.id }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "VIp2iiJEEE7xS20g",
+          "name": "Supabase account 2"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Start Isolated Checkpoint Test": {
+      "main": [
+        [
+          {
+            "node": "Create Isolated Test Research Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Isolated Test Research Run": {
+      "main": [
+        [
+          {
+            "node": "Create Isolated Test Batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Isolated Test Batch": {
+      "main": [
+        [
+          {
+            "node": "Save Synthetic NVIDIA Checkpoint",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Synthetic NVIDIA Checkpoint": {
+      "main": [
+        [
+          {
+            "node": "Read Back Synthetic Checkpoint",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Back Synthetic Checkpoint": {
+      "main": [
+        [
+          {
+            "node": "Validate Checkpoint Readback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Checkpoint Readback": {
+      "main": [
+        [
+          {
+            "node": "Delete Isolated Test Batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete Isolated Test Batch": {
+      "main": [
+        [
+          {
+            "node": "Delete Isolated Test Research Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  }
+}
