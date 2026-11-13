@@ -1,0 +1,126 @@
+{
+  "name": "OpenMontage - WF-03 Restore Context Test",
+  "nodes": [
+    {
+      "id": "a076de38-c99c-474c-b037-673f9baf36dc",
+      "name": "Start Restore Context Test",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "2d0e2ec8-8501-4a4c-8a95-0df7aa7bc40a",
+      "name": "Loop Over Extraction Batches",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "return [{json:{researchRunId:'test-run',batchId:'batch-0001',batchIndex:1,batchCount:1,candidateIds:['candidate-1'],primaryAttempts:0,recoveryAttempts:0,attemptHistory:[]}}];"
+      }
+    },
+    {
+      "id": "f5114e9a-90bf-4df0-9c0f-6c4d5cd132bb",
+      "name": "Mark Batch Processing",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        740,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "return [{json:{id:'ledger-row-1',research_run_id:'test-run',batch_id:'batch-0001',status:'processing',started_at:'2026-11-13T14:00:00.000Z',updated_at:'2026-11-13T14:00:00.000Z',attempt_history:[{provider:'openrouter',event:'started',attempt:1,at:'2026-11-13T14:00:00.000Z'}]}}];"
+      }
+    },
+    {
+      "id": "8b29ec25-bd71-4bec-aac8-1d9e6e9463b9",
+      "name": "Restore Batch Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1000,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const batch=$('Loop Over Extraction Batches').item.json; const ledger=$('Mark Batch Processing').item.json||{}; const attemptHistory=Array.isArray(ledger.attempt_history)?ledger.attempt_history:(Array.isArray(batch.attemptHistory)?batch.attemptHistory:[]); return [{json:{...batch,attemptHistory,processingStartedAt:ledger.started_at||ledger.updated_at||new Date().toISOString()}}];"
+      }
+    },
+    {
+      "id": "3a6b36ed-c3b7-41f4-823c-9a7d39ceab38",
+      "name": "Assert Restored Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1260,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const x=$input.first().json;if(x.researchRunId!=='test-run'||x.batchId!=='batch-0001'||x.attemptHistory?.[0]?.event!=='started'||x.processingStartedAt!=='2026-11-13T14:00:00.000Z')throw new Error('Restored context mismatch: '+JSON.stringify(x));return [{json:{testPassed:true,attemptHistory:x.attemptHistory,processingStartedAt:x.processingStartedAt}}];"
+      }
+    }
+  ],
+  "connections": {
+    "Start Restore Context Test": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Extraction Batches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Extraction Batches": {
+      "main": [
+        [
+          {
+            "node": "Mark Batch Processing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Batch Processing": {
+      "main": [
+        [
+          {
+            "node": "Restore Batch Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Restore Batch Context": {
+      "main": [
+        [
+          {
+            "node": "Assert Restored Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  }
+}
