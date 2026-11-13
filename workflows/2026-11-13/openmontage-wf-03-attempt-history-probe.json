@@ -1,0 +1,385 @@
+{
+  "name": "OpenMontage - WF-03 Attempt History Probe",
+  "nodes": [
+    {
+      "id": "3cb9ee54-f646-486f-ae71-4b57fa9b46a9",
+      "name": "Start Attempt History Probe",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "2b99ac0e-623b-4e75-9d8b-2b5f1fe27638",
+      "name": "Create Probe Run",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        480,
+        300
+      ],
+      "parameters": {
+        "authentication": "secretKey",
+        "resource": "row",
+        "operation": "create",
+        "tableId": "research_runs",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "product_id",
+              "fieldValue": "a1c196da-65de-451b-89fd-90f5d9b9623e"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "pending"
+            },
+            {
+              "fieldId": "provider",
+              "fieldValue": "test-only"
+            },
+            {
+              "fieldId": "model",
+              "fieldValue": "attempt-history-probe"
+            },
+            {
+              "fieldId": "idempotency_key",
+              "fieldValue": "={{ \"om-history-probe:\" + $execution.id }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "VIp2iiJEEE7xS20g",
+          "name": "Supabase account 2"
+        }
+      }
+    },
+    {
+      "id": "c39e6a1f-148b-4ac5-9c73-145ee35f243a",
+      "name": "Create Probe Batch",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        740,
+        300
+      ],
+      "parameters": {
+        "authentication": "secretKey",
+        "resource": "row",
+        "operation": "create",
+        "tableId": "research_batches",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "research_run_id",
+              "fieldValue": "={{ $(\"Create Probe Run\").item.json.id }}"
+            },
+            {
+              "fieldId": "batch_id",
+              "fieldValue": "om-history-probe-0001"
+            },
+            {
+              "fieldId": "batch_index",
+              "fieldValue": "={{ 1 }}"
+            },
+            {
+              "fieldId": "batch_count",
+              "fieldValue": "={{ 1 }}"
+            },
+            {
+              "fieldId": "candidate_ids",
+              "fieldValue": "={{ [\"candidate-1\"] }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "pending"
+            },
+            {
+              "fieldId": "attempt_history",
+              "fieldValue": "={{ [] }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "VIp2iiJEEE7xS20g",
+          "name": "Supabase account 2"
+        }
+      }
+    },
+    {
+      "id": "275ce05c-97e2-4521-86e3-a0d181d97fe5",
+      "name": "Write Attempt History",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1000,
+        300
+      ],
+      "parameters": {
+        "authentication": "secretKey",
+        "resource": "row",
+        "operation": "update",
+        "tableId": "research_batches",
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "research_run_id",
+              "condition": "eq",
+              "keyValue": "={{ $(\"Create Probe Run\").item.json.id }}"
+            },
+            {
+              "keyName": "batch_id",
+              "condition": "eq",
+              "keyValue": "om-history-probe-0001"
+            }
+          ]
+        },
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "status",
+              "fieldValue": "completed"
+            },
+            {
+              "fieldId": "primary_attempts",
+              "fieldValue": "={{ 1 }}"
+            },
+            {
+              "fieldId": "recovery_attempts",
+              "fieldValue": "={{ 1 }}"
+            },
+            {
+              "fieldId": "attempt_history",
+              "fieldValue": "={{ [{provider:\"openrouter\",event:\"started\",attempt:1},{provider:\"openrouter\",event:\"failed\",attempt:1},{provider:\"nvidia\",event:\"started\",attempt:1},{provider:\"nvidia\",event:\"succeeded\",attempt:1}] }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "VIp2iiJEEE7xS20g",
+          "name": "Supabase account 2"
+        }
+      }
+    },
+    {
+      "id": "aaaa01f7-9c1e-4394-9a3c-5782595c4f32",
+      "name": "Read Probe Batch",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1260,
+        300
+      ],
+      "parameters": {
+        "authentication": "secretKey",
+        "resource": "row",
+        "operation": "getAll",
+        "tableId": "research_batches",
+        "returnAll": true,
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "research_run_id",
+              "condition": "eq",
+              "keyValue": "={{ $(\"Create Probe Run\").item.json.id }}"
+            },
+            {
+              "keyName": "batch_id",
+              "condition": "eq",
+              "keyValue": "om-history-probe-0001"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "VIp2iiJEEE7xS20g",
+          "name": "Supabase account 2"
+        }
+      }
+    },
+    {
+      "id": "11f5ca25-fcd0-427b-9b50-a9d3529515b7",
+      "name": "Assert Probe",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1520,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const x=$input.first().json,h=x.attempt_history||[],e=h.map(v=>v.provider+':'+v.event); if(x.status!=='completed'||Number(x.primary_attempts)!==1||Number(x.recovery_attempts)!==1||!e.includes('openrouter:failed')||!e.includes('nvidia:succeeded'))throw new Error('Attempt history did not persist: '+JSON.stringify(x)); return [{json:{passed:true,events:e}}];"
+      }
+    },
+    {
+      "id": "74c00bdd-186f-4977-b511-5320ced86eba",
+      "name": "Delete Probe Batch",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1780,
+        300
+      ],
+      "parameters": {
+        "authentication": "secretKey",
+        "resource": "row",
+        "operation": "delete",
+        "tableId": "research_batches",
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "research_run_id",
+              "condition": "eq",
+              "keyValue": "={{ $(\"Create Probe Run\").item.json.id }}"
+            },
+            {
+              "keyName": "batch_id",
+              "condition": "eq",
+              "keyValue": "om-history-probe-0001"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "VIp2iiJEEE7xS20g",
+          "name": "Supabase account 2"
+        }
+      }
+    },
+    {
+      "id": "febac448-dc03-4ba9-8d2f-b1e6fa38a974",
+      "name": "Delete Probe Run",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2040,
+        300
+      ],
+      "parameters": {
+        "authentication": "secretKey",
+        "resource": "row",
+        "operation": "delete",
+        "tableId": "research_runs",
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $(\"Create Probe Run\").item.json.id }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "VIp2iiJEEE7xS20g",
+          "name": "Supabase account 2"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Start Attempt History Probe": {
+      "main": [
+        [
+          {
+            "node": "Create Probe Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Probe Run": {
+      "main": [
+        [
+          {
+            "node": "Create Probe Batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Probe Batch": {
+      "main": [
+        [
+          {
+            "node": "Write Attempt History",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Attempt History": {
+      "main": [
+        [
+          {
+            "node": "Read Probe Batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Probe Batch": {
+      "main": [
+        [
+          {
+            "node": "Assert Probe",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Assert Probe": {
+      "main": [
+        [
+          {
+            "node": "Delete Probe Batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete Probe Batch": {
+      "main": [
+        [
+          {
+            "node": "Delete Probe Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  }
+}
