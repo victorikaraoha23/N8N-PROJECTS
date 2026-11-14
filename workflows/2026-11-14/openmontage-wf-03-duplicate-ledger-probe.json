@@ -1,0 +1,416 @@
+{
+  "name": "OpenMontage - WF-03 Duplicate Ledger Probe",
+  "nodes": [
+    {
+      "id": "72f7d52e-5806-486d-a84f-0001da410e88",
+      "name": "Start Duplicate Ledger Probe",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "a83e3b4f-22c6-4c8e-9989-4778fa01517f",
+      "name": "Create Duplicate Probe Run",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        480,
+        300
+      ],
+      "parameters": {
+        "authentication": "secretKey",
+        "resource": "row",
+        "operation": "create",
+        "tableId": "research_runs",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "product_id",
+              "fieldValue": "a1c196da-65de-451b-89fd-90f5d9b9623e"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "pending"
+            },
+            {
+              "fieldId": "provider",
+              "fieldValue": "test-only"
+            },
+            {
+              "fieldId": "model",
+              "fieldValue": "duplicate-ledger-probe"
+            },
+            {
+              "fieldId": "idempotency_key",
+              "fieldValue": "={{ \"openmontage-wf03-duplicate-probe:\" + $execution.id }}"
+            },
+            {
+              "fieldId": "metadata",
+              "fieldValue": "={{ ({ test_only: true }) }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "VIp2iiJEEE7xS20g",
+          "name": "Supabase account 2"
+        }
+      }
+    },
+    {
+      "id": "7c4179f0-2aee-468e-9042-24b81cd4f601",
+      "name": "Create First Ledger Row",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        740,
+        300
+      ],
+      "parameters": {
+        "authentication": "secretKey",
+        "resource": "row",
+        "operation": "create",
+        "tableId": "research_batches",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "research_run_id",
+              "fieldValue": "={{ $(\"Create Duplicate Probe Run\").item.json.id }}"
+            },
+            {
+              "fieldId": "batch_id",
+              "fieldValue": "om-duplicate-probe-0001"
+            },
+            {
+              "fieldId": "batch_index",
+              "fieldValue": "={{ 1 }}"
+            },
+            {
+              "fieldId": "batch_count",
+              "fieldValue": "={{ 1 }}"
+            },
+            {
+              "fieldId": "candidate_ids",
+              "fieldValue": "={{ [\"probe-candidate\"] }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "pending"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "VIp2iiJEEE7xS20g",
+          "name": "Supabase account 2"
+        }
+      }
+    },
+    {
+      "id": "dbbbda8b-e4dd-4211-a7ed-98460849c562",
+      "name": "Attempt Duplicate Ledger Row",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1000,
+        300
+      ],
+      "parameters": {
+        "authentication": "secretKey",
+        "resource": "row",
+        "operation": "create",
+        "tableId": "research_batches",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "research_run_id",
+              "fieldValue": "={{ $(\"Create Duplicate Probe Run\").item.json.id }}"
+            },
+            {
+              "fieldId": "batch_id",
+              "fieldValue": "om-duplicate-probe-0001"
+            },
+            {
+              "fieldId": "batch_index",
+              "fieldValue": "={{ 1 }}"
+            },
+            {
+              "fieldId": "batch_count",
+              "fieldValue": "={{ 1 }}"
+            },
+            {
+              "fieldId": "candidate_ids",
+              "fieldValue": "={{ [\"probe-candidate\"] }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "pending"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "VIp2iiJEEE7xS20g",
+          "name": "Supabase account 2"
+        }
+      }
+    },
+    {
+      "id": "6b2c27e0-bb1e-4b5c-a399-b27ebeab32fb",
+      "name": "Count Duplicate Ledger Rows",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1260,
+        300
+      ],
+      "parameters": {
+        "authentication": "secretKey",
+        "resource": "row",
+        "operation": "getAll",
+        "tableId": "research_batches",
+        "returnAll": true,
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "research_run_id",
+              "condition": "eq",
+              "keyValue": "={{ $(\"Create Duplicate Probe Run\").item.json.id }}"
+            },
+            {
+              "keyName": "batch_id",
+              "condition": "eq",
+              "keyValue": "om-duplicate-probe-0001"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "VIp2iiJEEE7xS20g",
+          "name": "Supabase account 2"
+        }
+      }
+    },
+    {
+      "id": "272ae56c-9bac-4322-b10a-786ab804619c",
+      "name": "Report Duplicate Probe",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1520,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const rows=$input.all().map(x=>x.json||{}); return [{json:{duplicateInsertAccepted:rows.length===2,rowCount:rows.length,rowIds:rows.map(x=>x.id)}}];"
+      }
+    },
+    {
+      "id": "aad9b5ad-3b78-4f00-bdd8-a4e8e11665c4",
+      "name": "Delete Second Probe Row",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1780,
+        300
+      ],
+      "parameters": {
+        "authentication": "secretKey",
+        "resource": "row",
+        "operation": "delete",
+        "tableId": "research_batches",
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $(\"Attempt Duplicate Ledger Row\").item.json.id }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "VIp2iiJEEE7xS20g",
+          "name": "Supabase account 2"
+        }
+      }
+    },
+    {
+      "id": "97e2c3bc-9356-4f13-8e32-0c589c1539f6",
+      "name": "Delete First Probe Row",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2040,
+        300
+      ],
+      "parameters": {
+        "authentication": "secretKey",
+        "resource": "row",
+        "operation": "delete",
+        "tableId": "research_batches",
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $(\"Create First Ledger Row\").item.json.id }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "VIp2iiJEEE7xS20g",
+          "name": "Supabase account 2"
+        }
+      }
+    },
+    {
+      "id": "8090a12f-ab67-4ac7-af74-f437b2c5857e",
+      "name": "Delete Duplicate Probe Run",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2300,
+        300
+      ],
+      "parameters": {
+        "authentication": "secretKey",
+        "resource": "row",
+        "operation": "delete",
+        "tableId": "research_runs",
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $(\"Create Duplicate Probe Run\").item.json.id }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "VIp2iiJEEE7xS20g",
+          "name": "Supabase account 2"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Start Duplicate Ledger Probe": {
+      "main": [
+        [
+          {
+            "node": "Create Duplicate Probe Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Duplicate Probe Run": {
+      "main": [
+        [
+          {
+            "node": "Create First Ledger Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create First Ledger Row": {
+      "main": [
+        [
+          {
+            "node": "Attempt Duplicate Ledger Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Attempt Duplicate Ledger Row": {
+      "main": [
+        [
+          {
+            "node": "Count Duplicate Ledger Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Count Duplicate Ledger Rows": {
+      "main": [
+        [
+          {
+            "node": "Report Duplicate Probe",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Report Duplicate Probe": {
+      "main": [
+        [
+          {
+            "node": "Delete Second Probe Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete Second Probe Row": {
+      "main": [
+        [
+          {
+            "node": "Delete First Probe Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete First Probe Row": {
+      "main": [
+        [
+          {
+            "node": "Delete Duplicate Probe Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  }
+}
