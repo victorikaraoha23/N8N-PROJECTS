@@ -1,0 +1,126 @@
+{
+  "name": "OpenMontage - WF-03 Retry Limit Test",
+  "nodes": [
+    {
+      "id": "d68dbaa9-334c-4cf3-98a9-84986f578034",
+      "name": "Start Retry Limit Test",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "8fd1ec60-6b42-40d3-99dc-294a13494039",
+      "name": "Screen and Prepare Sources",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "return [{json:{batchId:'batch-0001',candidateIds:['c1'],researchRunId:'test-run'}},{json:{batchId:'batch-0002',candidateIds:['c2'],researchRunId:'test-run'}},{json:{batchId:'batch-0003',candidateIds:['c3'],researchRunId:'test-run'}}];"
+      }
+    },
+    {
+      "id": "9a82bc9d-fa04-4bd5-bae5-2e9a54bbc860",
+      "name": "Synthetic Ledger Fixtures",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        740,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "return [{json:{batch_id:'batch-0001',status:'failed',primary_attempts:1,recovery_attempts:1,id:'r1',attempt_history:[]}},{json:{batch_id:'batch-0002',status:'failed',primary_attempts:2,recovery_attempts:1,id:'r2',attempt_history:[]}},{json:{batch_id:'batch-0003',status:'completed',primary_attempts:1,recovery_attempts:1,id:'r3',attempt_history:[]}}];"
+      }
+    },
+    {
+      "id": "069e0874-00e6-4a8e-9c8c-4d68009ca817",
+      "name": "Filter Retryable Fixture Batches",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1000,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const rows=$input.all().map(x=>x.json||{}); const batches=$('Screen and Prepare Sources').all().map(x=>x.json||{}); const byId=new Map(rows.filter(x=>x.batch_id).map(x=>[String(x.batch_id),x])); const MAX_PRIMARY_ATTEMPTS=2,MAX_RECOVERY_ATTEMPTS=2; const retryable=[],exhausted=[]; for(const batch of batches){const row=byId.get(String(batch.batchId));if(!row)throw new Error('Missing batch ledger row: '+batch.batchId);if(row.status==='completed')continue;const primaryAttempts=Number(row.primary_attempts||0),recoveryAttempts=Number(row.recovery_attempts||0);if(primaryAttempts>=MAX_PRIMARY_ATTEMPTS||recoveryAttempts>=MAX_RECOVERY_ATTEMPTS){exhausted.push({batchId:batch.batchId,status:row.status,primaryAttempts,recoveryAttempts,errorMessage:row.error_message||null});continue;}retryable.push({json:{...batch,primaryAttempts,recoveryAttempts,ledgerRowId:row.id,attemptHistory:Array.isArray(row.attempt_history)?row.attempt_history:[]}});} if(retryable.length)return retryable;if(exhausted.length)return [{json:{allCompleted:true,retryExhausted:true,exhaustedBatches:exhausted}}];return [{json:{allCompleted:true}}];"
+      }
+    },
+    {
+      "id": "aae3e154-2ade-4fd2-af9a-5bf15b805cf3",
+      "name": "Assert Retry Limits",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1260,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const rows=$input.all().map(x=>x.json); if(rows.length!==1||rows[0].batchId!=='batch-0001')throw new Error('Retry cap selection incorrect: '+JSON.stringify(rows)); return [{json:{testPassed:true,retryableBatchIds:rows.map(x=>x.batchId),maxPrimaryAttempts:2,maxRecoveryAttempts:2}}];"
+      }
+    }
+  ],
+  "connections": {
+    "Start Retry Limit Test": {
+      "main": [
+        [
+          {
+            "node": "Screen and Prepare Sources",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Screen and Prepare Sources": {
+      "main": [
+        [
+          {
+            "node": "Synthetic Ledger Fixtures",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Synthetic Ledger Fixtures": {
+      "main": [
+        [
+          {
+            "node": "Filter Retryable Fixture Batches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Retryable Fixture Batches": {
+      "main": [
+        [
+          {
+            "node": "Assert Retry Limits",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  }
+}
