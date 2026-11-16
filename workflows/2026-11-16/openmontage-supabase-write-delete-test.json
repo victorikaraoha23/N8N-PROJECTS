@@ -1,0 +1,124 @@
+{
+  "name": "OpenMontage - Supabase Write/Delete Test",
+  "nodes": [
+    {
+      "id": "7be47896-dfd6-404b-8096-2339be47b3e1",
+      "name": "Manual Test Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "5a52b969-ddf8-4528-a7d3-766274ea9eef",
+      "name": "Insert Temporary Test Product",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        540,
+        300
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "create",
+        "authentication": "secretKey",
+        "tableId": "products",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "name",
+              "fieldValue": "OpenMontage Connectivity Test (temporary)"
+            },
+            {
+              "fieldId": "canonical_url",
+              "fieldValue": "https://openmontage.invalid/connectivity-test-2026-11-11"
+            },
+            {
+              "fieldId": "description",
+              "fieldValue": "Temporary record used only to verify n8n Supabase insert and delete permissions."
+            },
+            {
+              "fieldId": "product_type",
+              "fieldValue": "software"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "submitted"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "VIp2iiJEEE7xS20g",
+          "name": "Supabase account 2"
+        }
+      }
+    },
+    {
+      "id": "d8d77691-5ec1-49b8-aeb3-2d20448925e8",
+      "name": "Delete That Exact Test Product",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        840,
+        300
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "delete",
+        "authentication": "secretKey",
+        "tableId": "products",
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "canonical_url",
+              "condition": "eq",
+              "keyValue": "https://openmontage.invalid/connectivity-test-2026-11-11"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "VIp2iiJEEE7xS20g",
+          "name": "Supabase account 2"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Manual Test Trigger": {
+      "main": [
+        [
+          {
+            "node": "Insert Temporary Test Product",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Temporary Test Product": {
+      "main": [
+        [
+          {
+            "node": "Delete That Exact Test Product",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  }
+}
