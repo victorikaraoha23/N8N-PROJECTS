@@ -1,0 +1,224 @@
+{
+  "name": "OpenMontage WF-03 NVIDIA Recovery Validation Test",
+  "nodes": [
+    {
+      "id": "8747791a-f219-47d9-8695-964acc403f15",
+      "name": "Start",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "5df370a4-b7f0-4fb2-b4ad-170f1107823f",
+      "name": "Get Research Sources",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "return [{json:{id:'source-test-001',source_url:'https://example.test/product',title:'Product page',content_text:'A test source.'}}];"
+      }
+    },
+    {
+      "id": "4a43fcea-6fbf-4b87-830d-17d6e3b16d09",
+      "name": "Loop Over Extraction Batches",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "return [{json:{researchRunId:'00000000-0000-4000-8000-000000000001',productId:'00000000-0000-4000-8000-000000000002',batchId:'batch-test-0001',batchIndex:1,batchCount:1,candidateIds:['candidate-test-001'],candidates:[{candidate_id:'candidate-test-001',sentence:'The product supports team workspaces.',sources:[{source_id:'source-test-001',quote:'The product supports team workspaces.'}]}],ownerToken:'7b9aab01-faa9-4521-b88a-442e99cf7d12',generation:7,primaryAttempts:1,recoveryAttempts:0,attemptHistory:[],prompt:'SIMULATED TEST PROMPT'}}];"
+      }
+    },
+    {
+      "id": "e713a5d3-7c22-41c0-a7ac-6a8eb7afdbc8",
+      "name": "Simulated NVIDIA Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "return [{json:{text:JSON.stringify({classifications:['features']})}}];"
+      }
+    },
+    {
+      "id": "edb93a72-dc84-47a1-b590-b69d4ad3ed04",
+      "name": "Validate Recovered Claim Evidence Quotes",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "language": "javaScript",
+        "jsCode": "const batch=$('Prepare NVIDIA Recovery Input').item.json;\nfunction parseCompleteObject(raw) {\n const source=String(raw??'').trim();\n if(!source)throw new Error('NVIDIA returned an empty response for '+batch.batchId);\n const text=source.replace(/^\\\\uFEFF/,'').replace(/^\\\\s*```(?:json)?\\\\s*/i,'').replace(/\\\\s*```\\\\s*$/,'').trim();\n try{const value=JSON.parse(text);if(value&&typeof value==='object'&&!Array.isArray(value))return value;}catch{}\n let depth=0,start=-1,inString=false,escaped=false;\n for(let i=0;i<text.length;i++){\n  const ch=text[i];\n  if(inString){if(escaped)escaped=false;else if(ch.charCodeAt(0)===92)escaped=true;else if(ch==='\"')inString=false;continue;}\n  if(ch==='\"'){inString=true;continue;}\n  if(ch==='{'){if(depth===0)start=i;depth++;}\n  else if(ch==='}'&&depth>0){depth--;if(depth===0&&start>=0){try{const value=JSON.parse(text.slice(start,i+1));if(value&&typeof value==='object'&&!Array.isArray(value))return value;}catch{}start=-1;}}\n }\n throw new Error('NVIDIA returned no complete JSON object for '+batch.batchId+' (response length '+text.length+'): '+text.slice(0,180));\n}\nlet payload=$input.item.json?.text??$input.item.json?.output??$input.item.json;\nif(payload&&typeof payload==='object'&&payload.response?.generations?.[0]?.[0]?.text!==undefined)payload=payload.response.generations[0][0].text;\nelse if(payload&&typeof payload==='object'&&payload.generations?.[0]?.[0]?.text!==undefined)payload=payload.generations[0][0].text;\nelse if(payload&&typeof payload==='object'&&payload.message?.content!==undefined)payload=payload.message.content;\nif(typeof payload==='string')payload=parseCompleteObject(payload);\nif(payload&&typeof payload==='object'&&payload.output&&typeof payload.output==='object')payload=payload.output;\nif(!payload||typeof payload!=='object'||!Array.isArray(payload.classifications))throw new Error('NVIDIA response missing classifications array for '+batch.batchId);\nif(payload.classifications.length!==batch.candidates.length)throw new Error('NVIDIA returned '+payload.classifications.length+' classifications for '+batch.candidates.length+' candidates in '+batch.batchId);\nconst allowed=new Set(['features','pricing','audience','integrations','limitations','company','other','exclude']);\nconst sourceById=new Map($('Get Research Sources').all().map(item=>[String(item.json.id),item.json]));\nconst claims=[],classifiedIds=[];\nfor(let i=0;i<batch.candidates.length;i++){\n const candidate=batch.candidates[i],classification=String(payload.classifications[i]||'').toLowerCase().trim();\n if(!allowed.has(classification))throw new Error('Invalid NVIDIA classification at candidate index '+i+' in '+batch.batchId+': '+classification);\n classifiedIds.push(candidate.candidate_id);\n if(classification==='exclude')continue;\n if(!Array.isArray(candidate.sources)||!candidate.sources.length)throw new Error('Missing original source provenance for '+candidate.candidate_id);\n if(candidate.sources.some(s=>!sourceById.has(String(s.source_id))))throw new Error('Candidate references a source not loaded for '+candidate.candidate_id);\n claims.push({research_run_id:batch.researchRunId,candidate_id:candidate.candidate_id,claim_text:candidate.sentence,claim_type:classification,verification_status:'unverified',evidence:[\n  ...candidate.sources.map(s=>({source_id:s.source_id,source_url:sourceById.get(String(s.source_id)).source_url,quote:s.quote,evidence_type:'direct_quote'})),\n  {assessment_type:'claim_extraction',assessed_at:new Date().toISOString(),provider_path:'explicit NVIDIA recovery',model:'nvidia/nemotron-3.5-super-vl-120b-a12b',model_status:'valid_recovery',batch_id:batch.batchId}\n ]});\n}\nreturn {json:{researchRunId:batch.researchRunId,productId:batch.productId,batchId:batch.batchId,batchIndex:batch.batchIndex,batchCount:batch.batchCount,expectedCandidateIds:batch.candidateIds,classifiedIds,claims,providerPath:'nvidia',ownerToken:batch.ownerToken,generation:batch.generation,primaryAttempts:batch.primaryAttempts,recoveryAttempts:batch.recoveryAttempts,attemptHistory:[...(Array.isArray(batch.attemptHistory)?batch.attemptHistory:[]),{provider:'nvidia',status:'succeeded',attempted_at:new Date().toISOString()}]}};"
+      }
+    },
+    {
+      "id": "86a334b0-5e9a-47ee-aa0c-e4a84ef41cd7",
+      "name": "Wait - NVIDIA Recovery Pacing",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        160
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "return [{json:{error:{message:'SIMULATED OPENROUTER primary failure'}}}];"
+      }
+    },
+    {
+      "id": "b2926502-efcf-4f2b-a937-edf897f753fd",
+      "name": "Prepare NVIDIA Recovery Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        160
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "language": "javaScript",
+        "jsCode": "const batch=$('Loop Over Extraction Batches').item.json;\nconst failure=$('Wait - NVIDIA Recovery Pacing').item.json||{};\nif(!batch?.prompt||!batch.batchId)throw new Error('Could not recover original failed batch context.');\nconst primaryErrorMessage=String(failure.error?.message||failure.message||failure.errorMessage||'Primary extraction or quote validation failed').slice(0,2000);\nconst attemptHistory=Array.isArray(batch.attemptHistory)?batch.attemptHistory:[];\nreturn {json:{...batch,attemptHistory:[...attemptHistory,{provider:'openrouter',status:'failed',error_message:primaryErrorMessage,attempted_at:new Date().toISOString()}],primaryErrorMessage,recoveryAttempt:true,prompt:batch.prompt+'\\nRECOVERY: The primary output was invalid. Return exactly one classification per candidate in the original order using the required compact classifications array. Do not return candidate IDs, explanations or commentary. This is one bounded recovery attempt.'}};"
+      }
+    },
+    {
+      "id": "32705378-ecc1-4b40-980b-0b0493dc1d9f",
+      "name": "Simulated OpenRouter Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        -160
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "return [{json:{text:JSON.stringify({classifications:['features']})}}];"
+      }
+    },
+    {
+      "id": "45032b95-6f1b-46ef-9715-b433beefb6bb",
+      "name": "Validate Primary Claim Evidence Quotes",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        -160
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "language": "javaScript",
+        "jsCode": "const batch=$('Loop Over Extraction Batches').item.json;\nfunction parseCompleteObject(raw) {\n const source=String(raw??'').trim();\n if(!source)throw new Error('OpenRouter returned an empty response for '+batch.batchId);\n const text=source.replace(/^\\\\uFEFF/,'').replace(/^\\\\s*```(?:json)?\\\\s*/i,'').replace(/\\\\s*```\\\\s*$/,'').trim();\n try{const value=JSON.parse(text);if(value&&typeof value==='object'&&!Array.isArray(value))return value;}catch{}\n let depth=0,start=-1,inString=false,escaped=false;\n for(let i=0;i<text.length;i++){\n  const ch=text[i];\n  if(inString){if(escaped)escaped=false;else if(ch.charCodeAt(0)===92)escaped=true;else if(ch==='\"')inString=false;continue;}\n  if(ch==='\"'){inString=true;continue;}\n  if(ch==='{'){if(depth===0)start=i;depth++;}\n  else if(ch==='}'&&depth>0){depth--;if(depth===0&&start>=0){try{const value=JSON.parse(text.slice(start,i+1));if(value&&typeof value==='object'&&!Array.isArray(value))return value;}catch{}start=-1;}}\n }\n throw new Error('OpenRouter returned no complete JSON object for '+batch.batchId+' (response length '+text.length+'): '+text.slice(0,180));\n}\nlet payload=$input.item.json?.text??$input.item.json?.output??$input.item.json;\nif(payload&&typeof payload==='object'&&payload.response?.generations?.[0]?.[0]?.text!==undefined)payload=payload.response.generations[0][0].text;\nelse if(payload&&typeof payload==='object'&&payload.generations?.[0]?.[0]?.text!==undefined)payload=payload.generations[0][0].text;\nelse if(payload&&typeof payload==='object'&&payload.message?.content!==undefined)payload=payload.message.content;\nif(typeof payload==='string')payload=parseCompleteObject(payload);\nif(payload&&typeof payload==='object'&&payload.output&&typeof payload.output==='object')payload=payload.output;\nif(!payload||typeof payload!=='object'||!Array.isArray(payload.classifications))throw new Error('OpenRouter response missing classifications array for '+batch.batchId);\nif(payload.classifications.length!==batch.candidates.length)throw new Error('OpenRouter returned '+payload.classifications.length+' classifications for '+batch.candidates.length+' candidates in '+batch.batchId);\nconst allowed=new Set(['features','pricing','audience','integrations','limitations','company','other','exclude']);\nconst sourceById=new Map($('Get Research Sources').all().map(item=>[String(item.json.id),item.json]));\nconst claims=[],classifiedIds=[];\nfor(let i=0;i<batch.candidates.length;i++){\n const candidate=batch.candidates[i],classification=String(payload.classifications[i]||'').toLowerCase().trim();\n if(!allowed.has(classification))throw new Error('Invalid OpenRouter classification at candidate index '+i+' in '+batch.batchId+': '+classification);\n classifiedIds.push(candidate.candidate_id);\n if(classification==='exclude')continue;\n if(!Array.isArray(candidate.sources)||!candidate.sources.length)throw new Error('Missing original source provenance for '+candidate.candidate_id);\n if(candidate.sources.some(s=>!sourceById.has(String(s.source_id))))throw new Error('Candidate references a source not loaded for '+candidate.candidate_id);\n claims.push({research_run_id:batch.researchRunId,candidate_id:candidate.candidate_id,claim_text:candidate.sentence,claim_type:classification,verification_status:'unverified',evidence:[\n  ...candidate.sources.map(s=>({source_id:s.source_id,source_url:sourceById.get(String(s.source_id)).source_url,quote:s.quote,evidence_type:'direct_quote'})),\n  {assessment_type:'claim_extraction',assessed_at:new Date().toISOString(),provider_path:'OpenRouter primary',model:'openrouter/free',model_status:'valid_primary',batch_id:batch.batchId}\n ]});\n}\nreturn {json:{researchRunId:batch.researchRunId,productId:batch.productId,batchId:batch.batchId,batchIndex:batch.batchIndex,batchCount:batch.batchCount,expectedCandidateIds:batch.candidateIds,classifiedIds,claims,providerPath:'openrouter',ownerToken:batch.ownerToken,generation:batch.generation,primaryAttempts:batch.primaryAttempts,recoveryAttempts:batch.recoveryAttempts,attemptHistory:[...(Array.isArray(batch.attemptHistory)?batch.attemptHistory:[]),{provider:'openrouter',status:'succeeded',attempted_at:new Date().toISOString()}]}};"
+      }
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Get Research Sources",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Research Sources": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Extraction Batches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simulated NVIDIA Response": {
+      "main": [
+        [
+          {
+            "node": "Validate Recovered Claim Evidence Quotes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Extraction Batches": {
+      "main": [
+        [
+          {
+            "node": "Wait - NVIDIA Recovery Pacing",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Simulated OpenRouter Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait - NVIDIA Recovery Pacing": {
+      "main": [
+        [
+          {
+            "node": "Prepare NVIDIA Recovery Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare NVIDIA Recovery Input": {
+      "main": [
+        [
+          {
+            "node": "Simulated NVIDIA Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simulated OpenRouter Response": {
+      "main": [
+        [
+          {
+            "node": "Validate Primary Claim Evidence Quotes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  }
+}
