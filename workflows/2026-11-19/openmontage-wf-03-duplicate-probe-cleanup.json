@@ -1,0 +1,110 @@
+{
+  "name": "OpenMontage - WF-03 Duplicate Probe Cleanup",
+  "nodes": [
+    {
+      "id": "7d5d1d20-a223-4d21-80a2-aee489aafc3e",
+      "name": "Start Test Cleanup",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "081009c3-6865-4563-ae6c-a534d1129fe6",
+      "name": "Delete Duplicate Probe Batch",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        520,
+        300
+      ],
+      "parameters": {
+        "authentication": "secretKey",
+        "resource": "row",
+        "operation": "delete",
+        "tableId": "research_batches",
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "73417f01-b24a-40e7-b6ae-54c45c9febce"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "VIp2iiJEEE7xS20g",
+          "name": "Supabase account 2"
+        }
+      }
+    },
+    {
+      "id": "81b5624a-c9dd-4d88-8dba-86c5ff112766",
+      "name": "Delete Duplicate Probe Run",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        800,
+        300
+      ],
+      "parameters": {
+        "authentication": "secretKey",
+        "resource": "row",
+        "operation": "delete",
+        "tableId": "research_runs",
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "95c6bcae-a41b-4277-9d98-4b5f49d38876"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "VIp2iiJEEE7xS20g",
+          "name": "Supabase account 2"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Start Test Cleanup": {
+      "main": [
+        [
+          {
+            "node": "Delete Duplicate Probe Batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete Duplicate Probe Batch": {
+      "main": [
+        [
+          {
+            "node": "Delete Duplicate Probe Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  }
+}
