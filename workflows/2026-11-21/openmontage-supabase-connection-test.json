@@ -1,0 +1,315 @@
+{
+  "name": "OpenMontage - Supabase Connection Test",
+  "nodes": [
+    {
+      "id": "52f144f2-197f-4311-85a2-991d2e74634f",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "365eeecf-71b4-4af7-8291-9b7884da1221",
+      "name": "Test Supabase REST Connection",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        540,
+        300
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://xbjezqspoghnadlcunnj.supabase.co/rest/v1/research_runs?select=id&limit=0",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 15000
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "bsSgx3vUdbjiBca6",
+          "name": "Header Auth account 3"
+        }
+      }
+    },
+    {
+      "id": "ad018011-9004-4fd9-a29f-1827c4466917",
+      "name": "Prepare Lease RPC Test",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        560
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const researchRunId = '93810416-3333-4515-8071-2761251d246e';\nfunction uuidV4() { return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.floor(Math.random() * 16); return (c === 'x' ? r : ((r & 3) | 8)).toString(16); }); }\nreturn [{ json: { researchRunId, ownerToken: uuidV4(), contenderToken: uuidV4(), leaseSeconds: 300 } }];"
+      }
+    },
+    {
+      "id": "7b2aa4b6-d7ac-4c44-ba2a-694e43749f84",
+      "name": "Acquire Research Run Lease",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        500,
+        560
+      ],
+      "parameters": {
+        "method": "POST",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 15000
+        },
+        "url": "https://xbjezqspoghnadlcunnj.supabase.co/rest/v1/rpc/acquire_research_run_lease",
+        "jsonBody": "={{ ({ p_research_run_id: $json.researchRunId, p_owner_token: $json.ownerToken, p_lease_seconds: $json.leaseSeconds }) }}"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "bsSgx3vUdbjiBca6",
+          "name": "Header Auth account 3"
+        }
+      }
+    },
+    {
+      "id": "8ceebc51-d2f7-480d-8e3c-13b17a211abc",
+      "name": "Try Concurrent Lease Acquisition",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        760,
+        560
+      ],
+      "parameters": {
+        "method": "POST",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 15000
+        },
+        "url": "https://xbjezqspoghnadlcunnj.supabase.co/rest/v1/rpc/acquire_research_run_lease",
+        "jsonBody": "={{ ({ p_research_run_id: $('Prepare Lease RPC Test').first().json.researchRunId, p_owner_token: $('Prepare Lease RPC Test').first().json.contenderToken, p_lease_seconds: $('Prepare Lease RPC Test').first().json.leaseSeconds }) }}"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "bsSgx3vUdbjiBca6",
+          "name": "Header Auth account 3"
+        }
+      }
+    },
+    {
+      "id": "11e84cd4-13b9-4836-b727-173b6b343261",
+      "name": "Renew Research Run Lease",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1020,
+        560
+      ],
+      "parameters": {
+        "method": "POST",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 15000
+        },
+        "url": "https://xbjezqspoghnadlcunnj.supabase.co/rest/v1/rpc/renew_research_run_lease",
+        "jsonBody": "={{ ({ p_research_run_id: $('Prepare Lease RPC Test').first().json.researchRunId, p_owner_token: $('Prepare Lease RPC Test').first().json.ownerToken, p_lease_seconds: $('Prepare Lease RPC Test').first().json.leaseSeconds }) }}"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "bsSgx3vUdbjiBca6",
+          "name": "Header Auth account 3"
+        }
+      }
+    },
+    {
+      "id": "683a49f2-9243-473f-b398-8994dbbac0e3",
+      "name": "Release Research Run Lease",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1280,
+        560
+      ],
+      "parameters": {
+        "method": "POST",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 15000
+        },
+        "url": "https://xbjezqspoghnadlcunnj.supabase.co/rest/v1/rpc/release_research_run_lease",
+        "jsonBody": "={{ ({ p_research_run_id: $('Prepare Lease RPC Test').first().json.researchRunId, p_owner_token: $('Prepare Lease RPC Test').first().json.ownerToken }) }}"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "bsSgx3vUdbjiBca6",
+          "name": "Header Auth account 3"
+        }
+      }
+    },
+    {
+      "id": "992cc045-f842-4ad0-9745-ab9bc0a5d85d",
+      "name": "Reject Stale Generation Write",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1280,
+        760
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://xbjezqspoghnadlcunnj.supabase.co/rest/v1/rpc/fenced_update_research_run",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ ({\n      p_research_run_id: $('Prepare Lease RPC Test').first().json.researchRunId,\n      p_owner_token: $('Prepare Lease RPC Test').first().json.ownerToken,\n      p_generation: $('Acquire Research Run Lease').first().json.body + 1,\n      p_status: 'completed',\n      p_started_at: null,\n      p_completed_at: null,\n      p_summary: null,\n      p_error_message: null\n    }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "responseFormat": "json",
+              "neverError": true
+            }
+          },
+          "timeout": 15000
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "bsSgx3vUdbjiBca6",
+          "name": "Header Auth account 3"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Test Supabase REST Connection",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Prepare Lease RPC Test",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Lease RPC Test": {
+      "main": [
+        [
+          {
+            "node": "Acquire Research Run Lease",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Acquire Research Run Lease": {
+      "main": [
+        [
+          {
+            "node": "Try Concurrent Lease Acquisition",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Try Concurrent Lease Acquisition": {
+      "main": [
+        [
+          {
+            "node": "Renew Research Run Lease",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Renew Research Run Lease": {
+      "main": [
+        [
+          {
+            "node": "Reject Stale Generation Write",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reject Stale Generation Write": {
+      "main": [
+        [
+          {
+            "node": "Release Research Run Lease",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  }
+}
