@@ -1,0 +1,204 @@
+{
+  "name": "OpenMontage - WF-03 Bounded Validation",
+  "nodes": [
+    {
+      "id": "128ae937-df79-4729-af7a-b6b42a39fb2d",
+      "name": "Start Controlled WF-03 Test",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "219ebc25-98f7-438a-812d-f35947850003",
+      "name": "Create Isolated Test Research Run",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "create",
+        "authentication": "secretKey",
+        "tableId": "research_runs",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "product_id",
+              "fieldValue": "e56435f9-7b0b-47c7-b3ec-88e19f9b32eb"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "pending"
+            },
+            {
+              "fieldId": "idempotency_key",
+              "fieldValue": "openmontage-wf03-bounded-validation-2026-11-13"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "VIp2iiJEEE7xS20g",
+          "name": "Supabase account 2"
+        }
+      }
+    },
+    {
+      "id": "78d0fb10-e30a-45c6-ae7f-5e8a9656b74b",
+      "name": "Create One Controlled Test Source",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        448,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "create",
+        "authentication": "secretKey",
+        "tableId": "product_sources",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "product_id",
+              "fieldValue": "e56435f9-7b0b-47c7-b3ec-88e19f9b32eb"
+            },
+            {
+              "fieldId": "research_run_id",
+              "fieldValue": "={{ $json.id }}"
+            },
+            {
+              "fieldId": "source_type",
+              "fieldValue": "website"
+            },
+            {
+              "fieldId": "source_url",
+              "fieldValue": "https://validation.openmontage.local/wf03-test"
+            },
+            {
+              "fieldId": "title",
+              "fieldValue": "Controlled WF-03 validation fixture"
+            },
+            {
+              "fieldId": "description",
+              "fieldValue": "Synthetic test fixture; not a real product source."
+            },
+            {
+              "fieldId": "content_text",
+              "fieldValue": "This controlled fixture contains no factual product feature, pricing, integration, audience, limitation, or company claims. It exists only to test complete candidate classification and recovery handling."
+            },
+            {
+              "fieldId": "metadata",
+              "fieldValue": "={{ { test_fixture: true, purpose: \"wf03_nvidia_recovery_validation\", created_at: $now.toISO() } }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "VIp2iiJEEE7xS20g",
+          "name": "Supabase account 2"
+        }
+      }
+    },
+    {
+      "id": "a2773327-464a-47c8-867c-87b2c8a89988",
+      "name": "Run Published WF-03",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        672,
+        0
+      ],
+      "parameters": {
+        "mode": "once",
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "5Hct9ez35TqJsucK"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "researchRunId": "={{ $(\"Create Isolated Test Research Run\").first().json.id }}",
+            "productId": "e56435f9-7b0b-47c7-b3ec-88e19f9b32eb"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "researchRunId",
+              "displayName": "researchRunId",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "productId",
+              "displayName": "productId",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Start Controlled WF-03 Test": {
+      "main": [
+        [
+          {
+            "node": "Create Isolated Test Research Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Isolated Test Research Run": {
+      "main": [
+        [
+          {
+            "node": "Create One Controlled Test Source",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create One Controlled Test Source": {
+      "main": [
+        [
+          {
+            "node": "Run Published WF-03",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  }
+}
