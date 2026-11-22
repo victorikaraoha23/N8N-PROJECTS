@@ -1,0 +1,242 @@
+{
+  "name": "Prismbyte — WF-01 Content Research & Drafting",
+  "nodes": [
+    {
+      "id": "f71b2296-3a94-4982-8a5b-7addd768755d",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.5,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {
+        "updates": [
+          "message"
+        ]
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "q7UPlO6TvQBq87lT",
+          "name": "prismbyte telegram bot"
+        }
+      },
+      "webhookId": "14fbbc4f-00f6-4c37-98d1-64b56468437e"
+    },
+    {
+      "id": "a9aee1d4-d69a-4654-a226-db3dcc2a80d4",
+      "name": "Is Draft Command?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        500,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.message.text || \"\" }}",
+              "rightValue": "/draft",
+              "operator": {
+                "type": "string",
+                "operation": "startsWith"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "aa0d0c1f-470c-45cf-958b-eade51697201",
+      "name": "Research and Draft Article",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        820,
+        300
+      ],
+      "parameters": {
+        "promptType": "define",
+        "text": "={{\n\"You are the research editor and article writer for Prismbyte (prismbyte.site), a practical publication about AI SaaS tools, workflow automation, and troubleshooting for lean teams.\\n\\n\" +\n\"TOPIC REQUEST: \" + (($json.message.text || \"\").replace(/^\\/draft\\s*/i, \"\").trim()) + \"\\n\\n\" +\n\"RESEARCH REQUIREMENTS:\\n\" +\n\"1. Use your live web-search capability. First search site:prismbyte.site/blog for existing articles and compare topic, search intent, and angle. If this is already covered or substantially overlaps, do NOT write an article; return a clear DUPLICATE / UPDATE EXISTING ARTICLE recommendation with the relevant existing URL(s).\\n\" +\n\"2. Research the topic using primary sources first: official product documentation, standards, vendor documentation, and original research. Use reputable secondary sources only where needed.\\n\" +\n\"3. Include inline Markdown links for factual claims and a Sources section with source title, publisher, and direct URL. Do not invent citations, statistics, product features, prices, tests, or first-hand experience. If evidence is unavailable, say so and flag the claim for editorial verification.\\n\" +\n\"4. Do not invent affiliate links or imply Prismbyte has tested a product. Do not make up internal article URLs; suggest internal links only when you have verified the page exists on prismbyte.site.\\n\\n\" +\n\"PRISMBYTE EDITORIAL CONTEXT:\\n\" +\n\"Core clusters: (a) AI and SaaS tools for lean teams, (b) business/workflow automation, (c) troubleshooting and practical tech. Existing known coverage includes practical AI/SaaS tool selection, small-team AI pilots, workflow automation checklists and end-to-end automation, debugging software issues, and API integration troubleshooting. Check the live site for the full current article list before deciding overlap.\\n\\n\" +\n\"OUTPUT FORMAT:\\n\" +\n\"If not a duplicate, return: 1) editorial decision and why the angle is distinct; 2) article title and suggested lowercase hyphenated slug; 3) SEO title (aim under 60 characters) and meta description (aim 145-160 characters); 4) primary keyword, secondary phrases, search intent, and intended reader; 5) unique angle and concise outline; 6) complete useful Markdown article, approximately 1,200-1,800 words, with clear headings, practical examples, limitations, and actionable steps; 7) verified internal-link suggestions; 8) affiliate disclosure recommendation and rationale; 9) source list and an editorial QA checklist of claims needing human verification.\\n\\n\" +\n\"Write for a Nigerian and international small-business audience without assuming every reader is in the same market. Use clear, practical language. Do not pad word count. The output is a DRAFT FOR HUMAN REVIEW ONLY. Never publish, deploy, or claim approval. Return the research and draft in plain text/Markdown suitable for saving as an Astro content article after editorial review.\"\n}}",
+        "messages": {
+          "messageValues": [
+            {
+              "type": "SystemMessagePromptTemplate",
+              "message": "You are a careful research editor. Browse for evidence, distinguish verified facts from inference, and never fabricate sources or claims."
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ea626703-2009-4fed-88cd-ab9cf21c262d",
+      "name": "Perplexity Sonar — Web Research",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        800,
+        600
+      ],
+      "parameters": {
+        "model": "perplexity/sonar",
+        "options": {
+          "temperature": 0.2,
+          "maxTokens": 7000,
+          "timeout": 360000,
+          "maxRetries": 2
+        }
+      },
+      "credentials": {
+        "openRouterApi": {
+          "id": "tXV34j8GdgjTO9xz",
+          "name": "OpenRouter account"
+        }
+      }
+    },
+    {
+      "id": "a6beae9b-be4f-47b0-8d3d-1b951fc0174e",
+      "name": "Format Draft Messages",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const raw = $input.first().json.text || $input.first().json.output || 'The research model returned no draft text.';\nconst chatId = $('Telegram Trigger').first().json.message.chat.id;\nconst safe = raw.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\nconst chunks = safe.match(/[\\s\\S]{1,3500}/g) || ['No draft content was returned.'];\nreturn chunks.map((part, index) => ({ json: { chatId, text: 'Prismbyte draft — part ' + (index + 1) + '/' + chunks.length + '\\n\\n' + part } }));"
+      }
+    },
+    {
+      "id": "f4b63adc-24b9-4867-a439-80c422ea1293",
+      "name": "Send Draft to Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1400,
+        300
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $json.chatId }}",
+        "text": "={{ $json.text }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML",
+          "disable_web_page_preview": true
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "q7UPlO6TvQBq87lT",
+          "name": "prismbyte telegram bot"
+        }
+      },
+      "webhookId": "4c01bf5c-4869-4a93-b864-9181eeee3931"
+    },
+    {
+      "id": "f3d5d711-b669-455e-8e2c-95a1356b0239",
+      "name": "Send Bot Instructions",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        820,
+        500
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $json.message.chat.id }}",
+        "text": "Welcome to Prismbyte Content Assistant.\\n\\nSend /draft followed by a proposed article topic. I will research the topic, check for overlap with existing Prismbyte articles, and return a sourced draft for your editorial review.\\n\\nExample: /draft How small teams can evaluate AI meeting assistants\\n\\nNothing is published automatically.",
+        "additionalFields": {
+          "appendAttribution": false,
+          "disable_web_page_preview": true
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "q7UPlO6TvQBq87lT",
+          "name": "prismbyte telegram bot"
+        }
+      },
+      "webhookId": "b993b40e-c4f6-4965-894d-553217970544"
+    }
+  ],
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Is Draft Command?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Draft Command?": {
+      "main": [
+        [
+          {
+            "node": "Research and Draft Article",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Bot Instructions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Research and Draft Article": {
+      "main": [
+        [
+          {
+            "node": "Format Draft Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Perplexity Sonar — Web Research": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Research and Draft Article",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Draft Messages": {
+      "main": [
+        [
+          {
+            "node": "Send Draft to Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  }
+}
