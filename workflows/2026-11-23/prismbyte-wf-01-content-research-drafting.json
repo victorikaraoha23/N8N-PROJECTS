@@ -1,0 +1,3487 @@
+{
+  "name": "Prismbyte — WF-01 Content Research & Drafting",
+  "nodes": [
+    {
+      "id": "f71b2296-3a94-4982-8a5b-7addd768755d",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.5,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {
+        "updates": [
+          "message"
+        ]
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "q7UPlO6TvQBq87lT",
+          "name": "prismbyte telegram bot"
+        }
+      },
+      "webhookId": "14fbbc4f-00f6-4c37-98d1-64b56468437e"
+    },
+    {
+      "id": "a6beae9b-be4f-47b0-8d3d-1b951fc0174e",
+      "name": "Format Draft Messages",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const item = $input.first().json;\nif (item.duplicateCheckPassed !== true || item.qaPackagePreserved !== true) throw new Error('Draft delivery blocked: duplicate-check result or preserved QA package is missing.');\nlet raw = String(item.output || item.text || '').replace(/\\r\\n?/g, '\\n').trim();\nif (!raw) throw new Error('Draft delivery blocked: complete QA package was not preserved from the editorial QA node.');\nconst chatId = $('Telegram Trigger').first().json.message.chat.id;\nconst today = new Intl.DateTimeFormat('en-CA', {timeZone:'Africa/Lagos',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());\nconst fence = String.fromCharCode(96).repeat(3);\nconst markdownMatch = raw.match(new RegExp(fence + 'markdown\\\\n([\\\\s\\\\S]*?)' + fence));\nconst markdown = markdownMatch ? markdownMatch[1] : '';\nconst dateMatch = markdown.match(/^publishDate:\\s*[\"']?(\\d{4}-\\d{2}-\\d{2})[\"']?\\s*$/m);\nconst dateValue = dateMatch ? dateMatch[1] : '';\nconst parsedDate = dateValue ? new Date(dateValue + 'T00:00:00Z') : null;\nconst validDate = !!dateValue && !Number.isNaN(parsedDate.getTime()) && parsedDate.toISOString().slice(0,10) === dateValue && dateValue === today;\nif (!markdownMatch || !validDate) throw new Error('QA package blocked: QA-authored publishDate missing, invalid, or not today in Africa/Lagos (' + today + '). Article delivery and queue creation stopped.');\nif (!raw.endsWith('END OF QA PACKAGE')) throw new Error('QA package incomplete: END OF QA PACKAGE marker missing. Article delivery and queue creation stopped.');\nconst start = raw.indexOf('EDITORIAL QA RESULT');\nconst source = (start >= 0 ? raw.slice(start) : raw).trim();\nconst esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');\nfunction inline(s) {\n let out = esc(s);\n const code = [];\n const tick = String.fromCharCode(96);\n out = out.replace(new RegExp(tick+'([^'+tick+']+)'+tick,'g'),(_,value)=>{const key='\\u0000C'+code.length+'\\u0000';code.push('<code>'+value+'</code>');return key;});\n out = out.replace(/\\[([^\\]]+)\\]\\((https:\\/\\/[^)\\s]+)\\)/g,'<a href=\"$2\">$1</a>');\n out = out.replace(/\\*\\*(.+?)\\*\\*/g,'<b>$1</b>').replace(/__(.+?)__/g,'<b>$1</b>').replace(/(^|[^*])\\*([^*\\n]+)\\*/g,'$1<i>$2</i>').replace(/~~(.+?)~~/g,'<s>$1</s>');\n return out.replace(/\\u0000C(\\d+)\\u0000/g,(_,i)=>code[Number(i)]);\n}\nfunction blockHtml(block) {\n const lines=block.split('\\n');\n if (/^#{1,6}\\s+/.test(block)) return '<b>'+inline(block.replace(/^#{1,6}\\s+/,''))+'</b>';\n if (lines.every(x=>/^\\s*[-*]\\s+/.test(x))) return lines.map(x=>'• '+inline(x.replace(/^\\s*[-*]\\s+/,''))).join('\\n');\n if (lines.every(x=>/^\\s*\\d+[.)]\\s+/.test(x))) return lines.map(x=>inline(x.replace(/^\\s*(\\d+)[.)]\\s/,'$1. '))).join('\\n');\n if (lines.every(x=>/^\\s*>/.test(x))) return '<blockquote>'+lines.map(x=>inline(x.replace(/^\\s*>\\s?/,''))).join('\\n')+'</blockquote>';\n if (lines.length && lines.every(x=>/^\\s*\\|/.test(x))) {\n  const rows=lines.filter(x=>!(/^\\s*\\|[\\s:|-]+\\|\\s*$/).test(x));\n  if(rows.length>1){const heads=rows[0].split('|').slice(1,-1).map(x=>x.trim());return rows.slice(1).map(row=>row.split('|').slice(1,-1).map((cell,i)=>(heads[i]?'<b>'+inline(heads[i])+':</b> ':'')+inline(cell.trim())).join(' — ')).join('\\n');}\n }\n if (/^---+$/.test(block.trim()) || /^\\*\\*\\*+$/.test(block.trim())) return '━━━━━━━━━━';\n return lines.map(inline).join('\\n');\n}\nconst blocks=source.split(/\\n{2,}/).filter(x=>x.trim()).map(blockHtml);\nconst MAX=3200,chunks=[];let current='';\nfor(const block of blocks){\n if(block.length>MAX){if(current){chunks.push(current);current='';}const plain=block.replace(/<[^>]*>/g,'');let part='';for(const word of plain.split(/\\s+/)){const next=part?part+' '+word:word;if(next.length>MAX&&part){chunks.push(esc(part));part=word;}else part=next;}if(part)chunks.push(esc(part));continue;}\n const candidate=current?current+'\\n\\n'+block:block;\n if(candidate.length<=MAX)current=candidate;else{if(current)chunks.push(current);current=block;}\n}\nif(current)chunks.push(current);if(!chunks.length)chunks.push('No QA content was returned.');\nreturn chunks.map((part,i)=>({json:{chatId,text:'<b>Prismbyte QA — part '+(i+1)+'/'+chunks.length+'</b>\\n\\n'+part}}));"
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "f4b63adc-24b9-4867-a439-80c422ea1293",
+      "name": "Send Draft to Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1400,
+        300
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $json.chatId }}",
+        "text": "={{ $json.text }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML",
+          "disable_web_page_preview": true
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "q7UPlO6TvQBq87lT",
+          "name": "prismbyte telegram bot"
+        }
+      },
+      "webhookId": "4c01bf5c-4869-4a93-b864-9181eeee3931",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000
+    },
+    {
+      "id": "a21a9257-0c5a-4abd-8f90-b63910f2a496",
+      "name": "NVIDIA Nemotron — Article Research",
+      "type": "@n8n/n8n-nodes-langchain.lmChatNvidia",
+      "typeVersion": 1,
+      "position": [
+        800,
+        600
+      ],
+      "parameters": {
+        "model": "={{ \"nvidia/nemotron-3.5-super-vl-120b-a12b\" }}",
+        "options": {
+          "temperature": 0.2,
+          "maxTokens": 10000,
+          "timeout": 360000,
+          "maxRetries": 2
+        }
+      },
+      "credentials": {
+        "nvidiaApi": {
+          "id": "YX5QWgZzVmrNJnwP",
+          "name": "NVIDIA Nemotron account"
+        }
+      }
+    },
+    {
+      "id": "58263d11-b9d1-430f-9ba7-c289890431cf",
+      "name": "Route Telegram Command",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        500,
+        300
+      ],
+      "parameters": {
+        "mode": "rules",
+        "rules": {
+          "values": [
+            {
+              "outputKey": "Start",
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ ($json.message.text || '').trim().split(' ')[0].split('@')[0].toLowerCase() }}",
+                    "rightValue": "/start",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "outputKey": "Help",
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ ($json.message.text || '').trim().split(' ')[0].split('@')[0].toLowerCase() }}",
+                    "rightValue": "/help",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "outputKey": "Draft",
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ ($json.message.text || '').trim().split(' ')[0].split('@')[0].toLowerCase() }}",
+                    "rightValue": "/draft",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "outputKey": "Confirm",
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ ($json.message.text || '').trim().split(' ')[0].split('@')[0].toLowerCase() }}",
+                    "rightValue": "/confirm",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "outputKey": "Cancel",
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ ($json.message.text || '').trim().split(' ')[0].split('@')[0].toLowerCase() }}",
+                    "rightValue": "/cancel",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "outputKey": "Approve",
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ ($json.message.text || '').trim().split(' ')[0].split('@')[0].toLowerCase() }}",
+                    "rightValue": "/approve",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "outputKey": "Reject",
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ ($json.message.text || '').trim().split(' ')[0].split('@')[0].toLowerCase() }}",
+                    "rightValue": "/reject",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "Incoming message"
+        }
+      }
+    },
+    {
+      "id": "1f0dc4ef-3418-445b-9cd0-579dc1416c8b",
+      "name": "Reply — Start and Help",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        800,
+        120
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $json.message.chat.id }}",
+        "text": "={{ (($json.message.text || '').trim().split(' ')[0].split('@')[0].toLowerCase() === '/help') ? 'PRISMBYTE CONTENT ASSISTANT\\n\\nCommands:\\n/start — Open the assistant\\n/help — Show this guide\\n/draft — Start a new article request\\n/confirm — Start research and drafting after confirming your topic\\n/cancel — Cancel a pending request\\n/approve <article_id> — Approve a QA-PASS article during its 12-hour review window\\n/reject <article_id> — Reject an article during its review window\\n\\nDrafting: send /draft by itself, then send your topic separately. Review the repeated topic and send /confirm or /cancel.\\n\\nFor an eligible article, the 12-hour timer starts after the review notice is delivered. No response may lead to auto-publication only if all mandatory QA and deployment checks pass. Articles with QA flags or HOLD status are not eligible.' : 'Welcome to Prismbyte Content Assistant!\\n\\nSend /draft by itself, then send your topic separately. Review the repeated topic and send /confirm to begin, or /cancel to discard it.\\n\\nAfter an eligible article passes QA, I will send an article ID and a 12-hour review window. Use /approve <article_id> or /reject <article_id>. Articles with QA flags or HOLD status are not eligible for auto-publication.' }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "disable_web_page_preview": true
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "q7UPlO6TvQBq87lT",
+          "name": "prismbyte telegram bot"
+        }
+      },
+      "webhookId": "3fa840f1-7494-44c5-9a33-789a544030fb"
+    },
+    {
+      "id": "bfcd52c1-9862-4edd-895e-0c45a318675e",
+      "name": "Reply — Unknown Command",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        800,
+        700
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $json.chatId || $json.message.chat.id }}",
+        "text": "={{ $json.replyText || 'I didn’t recognise that command. Use /help to see the available commands.' }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "disable_web_page_preview": true
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "q7UPlO6TvQBq87lT",
+          "name": "prismbyte telegram bot"
+        }
+      },
+      "webhookId": "a836b7e0-dd86-48a6-9058-d3ab69defb69"
+    },
+    {
+      "id": "1111fedf-ada3-4050-8cb7-c270315a539d",
+      "name": "Reply — Draft Started",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1040,
+        360
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $('Load Pending Draft').first().json.chatId }}",
+        "text": "={{ 'Confirmed. I’m starting research and drafting for:\\n\\n' + $('Load Pending Draft').first().json.topic + '\\n\\nThis may take a little while. I’ll send the result here. It will not be published automatically.' }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "disable_web_page_preview": true
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "q7UPlO6TvQBq87lT",
+          "name": "prismbyte telegram bot"
+        }
+      },
+      "webhookId": "f149cb1f-0d8b-48a6-8e7b-ab0a20d6735c",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000
+    },
+    {
+      "id": "87d15375-eee1-4b69-90e4-40b2b919bd8d",
+      "name": "Reply — Draft Error",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1360,
+        620
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $('Telegram Trigger').first().json.message.chat.id }}",
+        "text": "={{ $json.qaGateReason ? 'PRISMBYTE — QA PACKAGE BLOCKED\\n\\n' + $json.qaGateReason + '\\n\\nThe article was not forwarded to the review queue and nothing was published.' : 'The draft could not be completed because the AI or a connected service returned an error. Your request has not been published. Please try again later.' }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "disable_web_page_preview": true
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "q7UPlO6TvQBq87lT",
+          "name": "prismbyte telegram bot"
+        }
+      },
+      "webhookId": "cbc5d56b-6ac4-485d-9617-d5c3712c0e17"
+    },
+    {
+      "id": "371893d5-8b1c-4c0b-a6cc-a27e37a83130",
+      "name": "Research and Draft Article",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        820,
+        300
+      ],
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ \"Prepare a researched, SEO-optimized Prismbyte article for this topic: \" + $('Load Pending Draft').first().json.topic + \"\\nRESEARCH AND EDITORIAL REQUIREMENTS:\\n- Use connected Tavily tools for current live research before drafting. Prefer official documentation/primary sources, then reputable independent sources. Use at least 5 genuinely relevant sources where available; never invent URLs or claim retrieval that did not occur.\\n- Identify search intent, target reader, one primary keyword, relevant secondary/semantic keywords, and the specific reader problem the article solves.\\n- Write a genuinely useful, original article. Use the primary keyword naturally in the H1/title, opening, and at least one relevant heading where appropriate. Use secondary terms naturally. Avoid keyword stuffing, repetitive headings, fabricated experience, and generic filler.\\n- Structure with one H1 (the frontmatter title), logical H2/H3 headings, concise paragraphs, useful examples, and a practical conclusion. Answer the likely search question directly near the beginning. Include FAQs only when they add genuine value.\\n- SEO title and meta description are represented on Prismbyte by the frontmatter title and description. Make the title descriptive and compelling without clickbait; write a unique, accurate meta description of roughly 140–160 characters where practical. Do not add unsupported frontmatter fields such as seoTitle or focusKeyword.\\n- Write for Nigerian and international small-business readers. Do not fabricate statistics, prices, product features, benchmarks, tests, or first-hand experience. Distinguish source-backed facts from analysis.\\n- Suggest internal links only when the exact existing Prismbyte URL is known; otherwise label the suggestion VERIFY URL and do not invent a link.\\n\\nPRISMBYTE ASTRO IMPORT FORMAT — REQUIRED:\\nReturn one complete Markdown file that can be saved directly as:\\nsrc/content/articles/{slug}.md\\nThe filename is the lowercase, hyphenated slug; do not add a slug field to frontmatter. Use exactly the supported frontmatter fields below, with valid YAML types:\\n---\\ntitle: \\\"SEO-friendly article title and H1\\\"\\ndescription: \\\"Unique meta description\\\"\\npublishDate: YYYY-MM-DD\\ncategory: \\\"ai-saas\\\"\\ntags:\\n  - \\\"relevant tag\\\"\\nauthor: \\\"Prismbyte Editorial\\\"\\ndraft: true\\nsources:\\n  - \\\"https://verified-source.example\\\"\\naffiliateDisclosure: false\\n---\\nAllowed category values are exactly ai-saas, automation, troubleshooting. Optional supported fields are updatedDate, featuredImage, featuredImageAlt, imageSource. Omit optional fields when unknown or not applicable. The sources array must contain only URLs actually used and verified. Set affiliateDisclosure true only when the article genuinely requires the site's affiliate disclosure; never imply a relationship or link that does not exist. Always set draft: true so the imported article remains unpublished until a human changes it. Do not use unsupported keys in YAML. The article body starts after the closing frontmatter delimiter.\\n\\nDELIVERY:\\n1. Brief SEO/editorial brief outside the file: search intent, primary keyword, secondary keywords, target reader, recommended internal links (verified URLs only; otherwise VERIFY URL), and suggested image/alt text if no asset exists.\\n2. Then provide ONE canonical, complete, copy-ready .md file in a single fenced markdown block, including YAML frontmatter and the entire article. This file must be independently saveable at the path above.\\n3. After the file, list source verification notes and a short human-review checklist.\\nLabel the whole result DRAFT FOR HUMAN REVIEW — NOT FOR PUBLICATION. Never commit, push, publish, or deploy the file or website.\" }}",
+        "options": {
+          "systemMessage": "You are Prismbyte's research and editorial drafting assistant for prismbyte.site. You MUST use connected Tavily tools for live research. Produce an SEO-optimized, genuinely useful article aligned to search intent, with natural keyword use, clear H1/H2/H3 structure, concise paragraphs, and verified sources. The final deliverable MUST include one complete, copy-ready Astro Markdown file for src/content/articles/{slug}.md, with valid YAML frontmatter using only the exact schema: title, description, publishDate, optional updatedDate, category (ai-saas|automation|troubleshooting), tags, author, featuredImage, featuredImageAlt, imageSource, draft, sources, affiliateDisclosure. Always set draft:true. The filename slug is not a frontmatter key. Do not invent image paths, internal URLs, sources, affiliate links, prices, tests or product claims. Omit unknown optional fields. Frontmatter title/description supply the page SEO title/meta description; do not add unsupported SEO keys. Do not commit, push, publish or deploy. Return DRAFT FOR HUMAN REVIEW only.",
+          "maxIterations": 8,
+          "returnIntermediateSteps": false
+        }
+      },
+      "onError": "continueErrorOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1500
+    },
+    {
+      "id": "c6a2da04-90ff-4f1e-a5cf-e7df3671da2b",
+      "name": "Tavily — Live Web Research",
+      "type": "@n8n/mcp-registry.tavily",
+      "typeVersion": 1.1,
+      "position": [
+        800,
+        760
+      ],
+      "parameters": {
+        "include": "all",
+        "options": {
+          "timeout": 90000
+        }
+      },
+      "credentials": {
+        "tavilyMcpOAuth2Api": {
+          "id": "5DhcuWRc8MK2gUEN",
+          "name": "Tavily account"
+        }
+      }
+    },
+    {
+      "id": "5b4bc307-f1ea-4283-9b65-524ac3a81968",
+      "name": "Editorial QA — Verify Sources and Claims",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1100,
+        520
+      ],
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ \"Independently fact-check and correct the complete incoming Prismbyte article package using the connected Tavily tools. Treat every statement, source URL and citation as unverified. Do not trust the drafting agent, previous QA notes, or your own memory as evidence.\" + \"\\n\\nINCOMING PACKAGE:\\n\" + ($json.output || $json.text || \"\") }}",
+        "options": {
+          "systemMessage": "You are Prismbyte's independent editorial fact-checker and release gate. Do not trust the drafting agent or your memory. Use connected Tavily tools for live source extraction and verification. Search snippets are not extracted sources.\n\nMANDATORY LIVE RESEARCH:\n1. Attempt Tavily extraction for EVERY URL in the incoming source list. Prefer one batch extraction containing the complete unique URL list, then additional targeted searches/extractions for material claims not covered by those pages.\n2. A search result, snippet, title, URL existence check, or model recollection is NOT an extracted source. Only content returned by Tavily extraction counts as EXTRACTED. Never relabel search results as extracted.\n3. If a source cannot be extracted, mark it FAILED/NOT EXTRACTED and remove it from the final Astro frontmatter sources array.\n4. For each source, record exact URL, title, publisher, actual retrieval status, short evidence excerpt or precise page section, and claims it supports.\n5. Verify time-sensitive facts against current official primary sources. For product capabilities, consult product/help pages as well as API documentation. API documentation alone cannot establish that a product is API-only or lacks web, desktop, or mobile apps.\n6. For comparisons, seek primary evidence from BOTH providers. Distinguish provider product surfaces, API model availability, cloud partners, regional endpoints, and self-hosting.\n\nREQUIRED AUDIT SECTIONS — ALL MUST APPEAR:\nA. SOURCE VERIFICATION TABLE: URL | title/publisher | retrieval status (EXTRACTED or FAILED) | evidence excerpt/section | claims supported.\nB. MATERIAL CLAIM AUDIT: one row for every material claim group: claim | exact supporting source URL | evidence | verdict (VERIFIED/CORRECTED/REMOVED/UNRESOLVED). Include current product names/versions, capabilities, pricing, limits, data handling, security/compliance, deployment, legal/jurisdiction, comparisons, statistics and examples.\nC. NUMERICAL AND COST AUDIT: for every numerical example/cost estimate show assumptions, quantity/token conversion, formula, input cost, output cost where applicable, arithmetic result and source for each price. Separate input and output costs. If no numerical example, state NOT APPLICABLE and explain. Never use vague results such as \"a few dollars\".\nD. PRODUCT CAPABILITY AND SCOPE AUDIT: verify web, desktop, mobile, API, SDK, integrations, self-hosting and cloud-partner options where relevant. State NOT APPLICABLE only when genuinely irrelevant.\nE. FINAL CONSISTENCY AUDIT: check the complete article, title, metadata, every section, table, example, FAQ, conclusion, source list and checklist for contradictions and stale claims. Confirm every correction appears consistently throughout.\n\nHIGH-RISK CLAIM RULES:\n- Challenge absolute wording: only, all, none, always, never, guaranteed, cannot, no option, exclusively. Retain only when exact scope is established by primary evidence; otherwise qualify/remove.\n- Do not infer app/platform limitations from API documentation.\n- For data residency distinguish consumer products, API products, provider infrastructure, cloud partners, endpoint/region choices and account-specific controls. Do not claim a US/EU guarantee without exact product-specific evidence.\n- For compliance, a certification or BAA offering does not automatically make a customer's deployment compliant. State eligible plans, activation requirements, covered features and exclusions.\n- Do not make broad legal claims about government access, Nigerian law, GDPR, CCPA or other regimes without directly relevant authoritative evidence. Mark unresolved legal interpretation NEEDS HUMAN VERIFICATION or remove it.\n- Self-hosting costs must consider hardware/GPU capacity, engineering, maintenance, power, hosting and opportunity cost.\n- Distinguish current products/models from legacy/deprecated models. Verify names, release status, context limits and pricing dates.\n- Never imply Prismbyte tested a product, has an affiliate relationship, or has active affiliate links unless established. Do not invent internal URLs.\n\nNUMERICAL CHECKS:\n- Recalculate arithmetic independently and show formula and assumptions.\n- For token estimates from words, state the assumed words-to-tokens conversion and label it an estimate.\n- Separate input/output token volumes and costs; do not calculate input-only costs as total costs.\n- Savings ratios must use the same assumptions and pricing tier.\n\nSEO AND ASTRO GATES:\n- Preserve real search intent and a clear primary keyword; use secondary terms naturally without stuffing.\n- Ensure title/H1/opening/meta description are accurate and aligned; article is useful, original, complete and structured with one H1.\n- One complete .md file only, valid YAML frontmatter and supported keys only: title, description, publishDate, optional updatedDate, category (ai-saas|automation|troubleshooting), tags, author, featuredImage, featuredImageAlt, imageSource, draft, sources, affiliateDisclosure.\n- Always draft: true. Omit unknown image fields. No slug, seoTitle or focusKeyword frontmatter keys.\n- publishDate must equal current Africa/Lagos date supplied in the incoming package; if absent or inconsistent, HOLD.\n- sources array contains only URLs actually extracted in this run and supporting article claims.\n\nDECISION:\n- PASS only when all material claims are supported by extracted evidence, all required audits are complete, calculations correct, no high-priority issue remains, and Astro/SEO checks pass.\n- PASS WITH FLAGS only for genuinely non-blocking, disclosed uncertainties; never hide unresolved high-priority corrections.\n- HOLD if any material claim lacks primary evidence, a source is only search-result-confirmed, extraction fails for a needed source, an audit is missing/incomplete, a calculation is missing/wrong, an absolute claim is unsupported, a correction is inconsistent, or the article is incomplete.\n- Never self-award PASS based on checklist assertions; evidence in audit tables must support the decision.\n\nOUTPUT:\nBegin with EDITORIAL QA RESULT and status. Then correction ledger, sections A-E, SEO brief, ONE canonical corrected .md file in one fenced markdown block, human-review checklist and final schema/consistency audit. Aim for a complete useful article of 900–1,200 words. Label DRAFT FOR HUMAN REVIEW — NOT FOR PUBLICATION. Never publish, commit, push or deploy. End exactly END OF QA PACKAGE.\n\nHEADING FORMAT: Use these exact level-two headings (letter prefixes A.–E. are optional): SOURCE VERIFICATION TABLE; MATERIAL CLAIM AUDIT; NUMERICAL AND COST AUDIT; PRODUCT CAPABILITY AND SCOPE AUDIT; FINAL CONSISTENCY AUDIT.",
+          "maxIterations": 8,
+          "returnIntermediateSteps": false
+        }
+      },
+      "onError": "continueErrorOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1500
+    },
+    {
+      "id": "e515dc25-2a0f-4c42-ba2e-36f4d2e6915a",
+      "name": "Save Pending Draft",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        360
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const msg = $('Telegram Trigger').first().json.message || {};\nconst store = $getWorkflowStaticData('global');\nstore.pendingDrafts = store.pendingDrafts || {};\nstore.pendingDrafts[String(msg.chat.id)] = { status: 'awaiting_topic', topic: '', createdAt: Date.now() };\nreturn [{ json: { chatId: msg.chat.id, replyText: 'What topic would you like me to research and draft?\\n\\nSend the topic in your next message. I will then show it back to you for confirmation before starting.' } }];"
+      }
+    },
+    {
+      "id": "03083621-ef62-4b18-bcec-61899b986c82",
+      "name": "Load Pending Draft",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        800,
+        900
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const msg = $('Telegram Trigger').first().json.message || {};\nconst store = $getWorkflowStaticData('global');\nconst key = String(msg.chat.id);\nconst pending = store.pendingDrafts && store.pendingDrafts[key];\nconst valid = !!pending && Number.isFinite(pending.createdAt) && (Date.now() - pending.createdAt <= 30 * 60 * 1000);\nif (!valid && pending) delete store.pendingDrafts[key];\nconst ready = valid && pending.status === 'awaiting_confirmation' && !!pending.topic;\nif (ready) delete store.pendingDrafts[key];\nlet replyText = '';\nif (!valid) replyText = 'There is no active draft request. Send /draft to begin.';\nelse if (pending.status === 'awaiting_topic') replyText = 'I still need your topic. Please send it in a separate message, or use /cancel to stop.';\nelse if (!ready) replyText = 'There is no topic ready for confirmation. Send /draft to begin again.';\nreturn [{ json: { chatId: msg.chat.id, topic: ready ? pending.topic : '', hasPending: ready, replyText } }];"
+      }
+    },
+    {
+      "id": "fc414d26-8f73-4729-b73b-0dda2d668f87",
+      "name": "Has Pending Draft?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1040,
+        900
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.hasPending ? 'yes' : 'no' }}",
+              "rightValue": "yes",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "9b88c59c-3336-4fc3-a254-f2be762eafdf",
+      "name": "Clear Pending Draft",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        800,
+        1200
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const msg = $('Telegram Trigger').first().json.message || {};\nconst store = $getWorkflowStaticData('global');\nif (store.pendingDrafts) delete store.pendingDrafts[String(msg.chat.id)];\nreturn [{ json: { chatId: msg.chat.id, replyText: 'Your pending request has been cancelled. No research or drafting was started.' } }];"
+      }
+    },
+    {
+      "id": "182cffb7-fc87-4231-a14d-bc3a5a29b12d",
+      "name": "Handle Topic Reply",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        800,
+        1450
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const msg = $('Telegram Trigger').first().json.message || {};\nconst store = $getWorkflowStaticData('global');\nstore.pendingDrafts = store.pendingDrafts || {};\nconst key = String(msg.chat.id);\nconst text = String(msg.text || '').trim();\nconst pending = store.pendingDrafts[key];\nconst valid = !!pending && Number.isFinite(pending.createdAt) && (Date.now() - pending.createdAt <= 30 * 60 * 1000);\nlet replyText;\nif (!text || text.startsWith('/')) replyText = 'I didn’t recognise that command. Use /help to see the available commands.';\nelse if (!valid) { if (pending) delete store.pendingDrafts[key]; replyText = 'I wasn’t waiting for a topic. Send /draft to begin a new request.'; }\nelse if (pending.status !== 'awaiting_topic') replyText = 'You already supplied a topic. Reply /confirm to start, or /cancel to discard it.';\nelse { pending.topic = text; pending.status = 'awaiting_confirmation'; store.pendingDrafts[key] = pending; replyText = 'Please confirm this article request:\\n\\n' + text + '\\n\\nReply /confirm to start research and drafting, or /cancel to discard it. This request expires 30 minutes after /draft.'; }\nreturn [{ json: { chatId: msg.chat.id, replyText } }];"
+      }
+    },
+    {
+      "id": "a96c0b2a-ce7b-4ef5-9f9a-8e9a011fff24",
+      "name": "Inject Current WAT Date",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        520
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const item = $input.first().json;\nconst today = new Intl.DateTimeFormat('en-CA', {timeZone:'Africa/Lagos', year:'numeric', month:'2-digit', day:'2-digit'}).format(new Date());\nconst source = String(item.output || item.text || '');\nreturn [{json:{...item, output:'CURRENT SITE DATE (Africa/Lagos): ' + today + '\\nThe final Astro frontmatter publishDate must equal this exact date. Correct it in the canonical article or set HOLD.\\n\\n' + source}}];"
+      }
+    },
+    {
+      "id": "3b35698b-d093-4ea4-83ef-8587f841c836",
+      "name": "QA Package Gate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1360,
+        520
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const item = $input.first().json;\nconst raw = String(item.output || item.text || '').replace(/\\r\\n?/g, '\\n').trim();\nconst today = new Intl.DateTimeFormat('en-CA', {timeZone:'Africa/Lagos',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());\nconst marker = String.fromCharCode(96).repeat(3) + 'markdown';\nconst fence = String.fromCharCode(96).repeat(3);\nconst start = raw.indexOf(marker);\nconst contentStart = start >= 0 ? raw.indexOf('\\n', start + marker.length) + 1 : -1;\nconst end = contentStart > 0 ? raw.indexOf(fence, contentStart) : -1;\nconst article = end > contentStart ? raw.slice(contentStart, end) : '';\nconst fmStart = article.startsWith('---\\n') ? 4 : -1;\nconst fmEnd = fmStart >= 0 ? article.indexOf('\\n---', fmStart) : -1;\nconst fm = fmEnd > fmStart ? article.slice(fmStart, fmEnd) : '';\nconst dateLine = fm.split('\\n').find(line => /^publishDate:\\s*/.test(line)) || '';\nconst date = dateLine.replace(/^publishDate:\\s*/,'').trim().replace(/^[\"']|[\"']$/g,'');\nconst parsed = date ? new Date(date + 'T00:00:00Z') : null;\nconst validDate = !!date && !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0,10) === date && date === today;\nconst draftTrue = /^draft:\\s*true\\s*$/m.test(fm);\nconst header = raw.slice(0, Math.max(0, raw.indexOf('EDITORIAL QA RESULT') + 300));\nconst status = header.includes('PASS WITH FLAGS') ? 'PASS WITH FLAGS' : header.includes('HOLD') ? 'HOLD' : /\\bPASS\\b/.test(header) ? 'PASS' : 'MISSING';\nconst complete = raw.endsWith('END OF QA PACKAGE');\nconst issues = [];\nif (!article) issues.push('Canonical Markdown article block is missing.');\nif (!fm) issues.push('Valid YAML frontmatter block is missing.');\nif (!validDate) issues.push('publishDate does not match current Africa/Lagos date ' + today + '.');\nif (!draftTrue) issues.push('Canonical article must contain draft: true.');\nif (!complete) issues.push('Required END OF QA PACKAGE marker is missing.');\nconst sourceMatch = fm.match(/^sources:\\s*\\n((?:[ \\t]+-[^\\n]*\\n?)*)/m);\nconst sourceUrls = sourceMatch ? [...sourceMatch[1].matchAll(/https:\\/\\/[^\\s\"'<>]+/g)].map(m=>m[0].replace(/[),.;]+$/g,'')) : [];\nconst sourceSectionMatch = raw.match(/##\\s+(?:[A-E]\\.\\s*)?SOURCE VERIFICATION TABLE([\\s\\S]*?)(?=\\n## |\\n---\\n)/i);\nconst sourceSection = sourceSectionMatch ? sourceSectionMatch[1] : '';\nconst sourceRows = sourceSection.split('\\n').filter(line=>/^\\s*\\|/.test(line) && !/^\\s*\\|[\\s:|-]+\\|\\s*$/.test(line));\nif (!sourceUrls.length) issues.push('Frontmatter sources array is missing or empty.');\nif (!sourceSection) issues.push('Required SOURCE VERIFICATION TABLE is missing.');\nfor (const url of sourceUrls) {\n  const row = sourceRows.find(line=>line.includes(url));\n  if (!row) issues.push('Source missing from verification table: ' + url);\n  else {\n    if (!/\\bEXTRACTED\\b/i.test(row) || /SEARCH\\s+RESULT|SNIPPET|NOT\\s+EXTRACTED|FAILED|UNVERIFIED/i.test(row)) issues.push('Source is not confirmed as actually extracted: ' + url);\n    if (row.length < 90) issues.push('Source row lacks specific evidence/claim detail: ' + url);\n  }\n}\nif (/SEARCH\\s+RESULT\\s+CONFIRMED|SEARCH\\s+RESULT\\s+ONLY|NOT\\s+EXTRACTED/i.test(sourceSection)) issues.push('Search-result-only evidence is present in source audit.');\nfunction auditSection(name) {\n  const re = new RegExp('##\\\\s+(?:[A-E]\\\\.\\\\s*)?' + name + '\\\\s*([\\\\s\\\\S]*?)(?=\\\\n##\\\\s+|\\\\n---\\\\n|$)','i');\n  const m = raw.match(re);\n  return m ? m[1] : '';\n}\nfunction tableRows(section) {\n  return section.split('\\n').filter(line=>/^\\s*\\|/.test(line) && !/^\\s*\\|[\\s:|-]+\\|\\s*$/.test(line)).slice(1);\n}\nconst claimAudit = auditSection('MATERIAL CLAIM AUDIT');\nconst claimRows = tableRows(claimAudit);\nif (!claimAudit) issues.push('Required MATERIAL CLAIM AUDIT is missing.');\nif (claimRows.length < 4) issues.push('Material claim audit must contain at least four substantive claim rows.');\nif (/UNRESOLVED|UNVERIFIED|UNSUPPORTED|NEEDS HUMAN VERIFICATION|NOT VERIFIED/i.test(claimAudit)) issues.push('Material claim audit contains unresolved or unsupported claims.');\nconst numericalAudit = auditSection('NUMERICAL AND COST AUDIT');\nconst numericalRows = tableRows(numericalAudit);\nconst hasNumbers = /[$€£₦]|\\b\\d[\\d,]*(?:\\.\\d+)?\\s*(?:%|per\\s+(?:month|year|week)|million|billion|tokens|users|customers|requests|days|hours|words|models|integrations)\\b/i.test(article);\nif (!numericalAudit) issues.push('Required NUMERICAL AND COST AUDIT is missing.');\nif (hasNumbers && numericalRows.length < 1) issues.push('Numerical/cost claims exist but no auditable calculation/evidence rows were supplied.');\nif (hasNumbers && !/formula|calculation|assumption|input|output|not applicable/i.test(numericalAudit)) issues.push('Numerical audit lacks assumptions/formula or explicit applicability statement.');\nif (/INCORRECT|UNVERIFIED|UNSUPPORTED|NEEDS HUMAN VERIFICATION|UNRESOLVED/i.test(numericalAudit)) issues.push('Numerical audit reports unresolved or incorrect calculations.');\nconst capabilityAudit = auditSection('PRODUCT CAPABILITY AND SCOPE AUDIT');\nif (!capabilityAudit) issues.push('Required PRODUCT CAPABILITY AND SCOPE AUDIT is missing.');\nif (/UNRESOLVED|UNVERIFIED|UNSUPPORTED|NEEDS HUMAN VERIFICATION/i.test(capabilityAudit)) issues.push('Product capability/scope audit contains unresolved claims.');\nconst consistencyAudit = auditSection('FINAL CONSISTENCY AUDIT');\nif (!consistencyAudit || !/\\bPASS\\b/i.test(consistencyAudit)) issues.push('Final consistency audit is missing or does not explicitly pass.');\nif (/CONTRADICTION FOUND|INCONSISTENT|NOT APPLIED|UNRESOLVED/i.test(consistencyAudit)) issues.push('Final consistency audit reports a contradiction or unapplied correction.');\nconst structurallyValid = !!article && !!fm && validDate && draftTrue && complete;\nconst auditPassed = sourceUrls.length > 0 && !!sourceSection && issues.length === 0;\nconst qaGatePassed = structurallyValid && auditPassed;\nconst reason = qaGatePassed ? '' : issues.join(' ');\nreturn [{json:{...item,qaGatePassed,qaStatus:status,qaGateDate:date,qaGateToday:today,qaGateReason:reason,qaGateAudit:{sourceCount:sourceUrls.length,sourceRows:sourceRows.length,claimRows:claimRows.length,numericalRows:numericalRows.length,capabilityAuditPresent:!!capabilityAudit,consistencyAuditPresent:!!consistencyAudit,issues}}}];"
+      }
+    },
+    {
+      "id": "be8c27bc-df7b-4b8f-af14-fcc0a9fecebc",
+      "name": "Prepare Article Review Queue Record",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1640,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const sentItems = $('Send Draft to Telegram').all();\nconst qa = $('Editorial QA — Verify Sources and Claims').first().json;\nconst raw = String(qa.output || qa.text || '').replace(/\\r\\n?/g, '\\n').trim();\nconst topic = String($('Load Pending Draft').first().json.topic || '').trim();\nconst fence = String.fromCharCode(96).repeat(3);\nconst marker = fence + 'markdown';\nconst start = raw.indexOf(marker);\nconst contentStart = start >= 0 ? raw.indexOf('\\n', start + marker.length) + 1 : -1;\nconst end = contentStart > 0 ? raw.indexOf(fence, contentStart) : -1;\nconst article = end > contentStart ? raw.slice(contentStart, end).trim() : '';\nif (!article.startsWith('---\\n')) throw new Error('Queue blocked: canonical article frontmatter is missing.');\nconst fmEnd = article.indexOf('\\n---', 4);\nif (fmEnd < 0) throw new Error('Queue blocked: frontmatter closing delimiter is missing.');\nconst frontmatter = article.slice(4, fmEnd);\nif (!raw.endsWith('END OF QA PACKAGE')) throw new Error('Queue blocked: required END OF QA PACKAGE marker is missing.');\nconst today = new Intl.DateTimeFormat('en-CA', {timeZone:'Africa/Lagos',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());\nconst publishDateLine = frontmatter.split('\\n').find(line => /^publishDate:\\s*/.test(line)) || '';\nconst publishDate = publishDateLine.replace(/^publishDate:\\s*/, '').trim().replace(/^[\"']|[\"']$/g, '');\nconst parsedPublishDate = publishDate ? new Date(publishDate + 'T00:00:00Z') : null;\nconst validPublishDate = !!publishDate && !Number.isNaN(parsedPublishDate.getTime()) && parsedPublishDate.toISOString().slice(0,10) === publishDate && publishDate === today;\nif (!validPublishDate) throw new Error('Queue blocked: QA-authored publishDate is missing, invalid, or not today in Africa/Lagos (' + today + ').');\nconst titleLine = frontmatter.split('\\n').find(line => line.startsWith('title:')) || '';\nconst title = titleLine.slice(6).trim().replace(/^[\"']|[\"']$/g, '');\nif (!title) throw new Error('Queue blocked: article title is missing.');\nconst slug = title.toLowerCase().normalize('NFKD').replace(/[\\u0300-\\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');\nif (!slug) throw new Error('Queue blocked: could not derive a safe article slug.');\nconst sourceLines = frontmatter.split('\\n');\nconst sourceIndex = sourceLines.findIndex(line => line.trim() === 'sources:');\nconst sourceUrls = [];\nif (sourceIndex >= 0) for (let i=sourceIndex+1;i<sourceLines.length;i++){const line=sourceLines[i];if(!/^\\s+-\\s+/.test(line))break;const url=line.replace(/^\\s+-\\s+/,'').trim().replace(/^[\"']|[\"']$/g,'');if(/^https:\\/\\//i.test(url))sourceUrls.push(url);}\nconst headerIndex = raw.indexOf('EDITORIAL QA RESULT');\nconst header = headerIndex >= 0 ? raw.slice(headerIndex, headerIndex + 300) : '';\nconst qaStatus = header.includes('PASS WITH FLAGS') ? 'PASS WITH FLAGS' : header.includes('PASS') ? 'PASS' : header.includes('HOLD') ? 'HOLD' : 'MISSING';\nif (qaStatus === 'MISSING') throw new Error('Queue blocked: editorial QA status is missing or unrecognized.');\nconst messageIds = sentItems.map(item => item.json?.result?.message_id).filter(id => Number.isInteger(id));\nif (!sentItems.length || messageIds.length !== sentItems.length) throw new Error('Queue blocked: Telegram did not confirm delivery of every article message.');\nconst articleId = 'PB-' + String($execution.id);\nconst eligible = qaStatus === 'PASS';\nreturn [{json:{article_id:articleId,topic,slug,article_markdown:article,source_urls_json:JSON.stringify(sourceUrls),qa_status:qaStatus,qa_flags_json:JSON.stringify({status:qaStatus,autoPublishEligible:eligible,reason:eligible?null:'Only exact PASS is eligible for the 12-hour review window.'}),review_status:eligible?'awaiting_review_notice':'hold_qa_flags',telegram_delivery_status:'article_chunks_delivered',telegram_message_ids:JSON.stringify(messageIds),review_sent_at:null,deadline_at:null,decision_at:null,decision_source:null,publish_status:eligible?'awaiting_review_notice':'blocked_qa',published_commit:null,published_url:null,last_error:null}}];"
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "018e0235-32e8-4867-97bd-2e08861fde6f",
+      "name": "Persist Article Review Queue",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1880,
+        300
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "upsert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "XEF45ga6YPLG0e3q"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "article_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.article_id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "article_id": "={{ $json.article_id }}",
+            "topic": "={{ $json.topic }}",
+            "slug": "={{ $json.slug }}",
+            "article_markdown": "={{ $json.article_markdown }}",
+            "source_urls_json": "={{ $json.source_urls_json }}",
+            "qa_status": "={{ $json.qa_status }}",
+            "qa_flags_json": "={{ $json.qa_flags_json }}",
+            "review_status": "={{ $json.review_status }}",
+            "telegram_delivery_status": "={{ $json.telegram_delivery_status }}",
+            "telegram_message_ids": "={{ $json.telegram_message_ids }}",
+            "review_sent_at": "={{ $json.review_sent_at }}",
+            "deadline_at": "={{ $json.deadline_at }}",
+            "decision_at": "={{ $json.decision_at }}",
+            "decision_source": "={{ $json.decision_source }}",
+            "publish_status": "={{ $json.publish_status }}",
+            "published_commit": "={{ $json.published_commit }}",
+            "published_url": "={{ $json.published_url }}",
+            "last_error": "={{ $json.last_error }}"
+          },
+          "schema": [
+            {
+              "id": "article_id",
+              "displayName": "article_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "topic",
+              "displayName": "topic",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "slug",
+              "displayName": "slug",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "article_markdown",
+              "displayName": "article_markdown",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "source_urls_json",
+              "displayName": "source_urls_json",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "qa_status",
+              "displayName": "qa_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "qa_flags_json",
+              "displayName": "qa_flags_json",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "review_status",
+              "displayName": "review_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "telegram_delivery_status",
+              "displayName": "telegram_delivery_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "telegram_message_ids",
+              "displayName": "telegram_message_ids",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "review_sent_at",
+              "displayName": "review_sent_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "date",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "deadline_at",
+              "displayName": "deadline_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "date",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "decision_at",
+              "displayName": "decision_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "date",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "decision_source",
+              "displayName": "decision_source",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "publish_status",
+              "displayName": "publish_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "published_commit",
+              "displayName": "published_commit",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "published_url",
+              "displayName": "published_url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "last_error",
+              "displayName": "last_error",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "2f02540a-c322-44fc-adb3-8d6186af911d",
+      "name": "Parse Review Decision",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        800,
+        1700
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const msg = $('Telegram Trigger').first().json.message || {};\nconst text = String(msg.text || '').trim();\nconst parts = text.split(/\\s+/);\nconst command = String(parts[0] || '').split('@')[0].toLowerCase();\nconst decision = command === '/approve' ? 'approve' : command === '/reject' ? 'reject' : '';\nconst articleId = String(parts[1] || '').trim();\nconst chatId = msg.chat && msg.chat.id !== undefined ? String(msg.chat.id) : '';\nconst fromId = msg.from && msg.from.id !== undefined ? String(msg.from.id) : '';\nconst authorized = chatId === '7392605484' && fromId === '7392605484' && msg.chat.type === 'private';\nconst validArticleId = /^PB-[A-Za-z0-9_-]+$/.test(articleId);\nreturn [{json:{authorized,decision,article_id:articleId,validArticleId,chatId:Number(msg.chat?.id || 0),command}}];"
+      }
+    },
+    {
+      "id": "18a7a12e-2d10-46c0-8ae6-2634f7c877c4",
+      "name": "Authorized Review Chat?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1040,
+        1700
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.authorized ? 'yes' : 'no' }}",
+              "rightValue": "yes",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "70186e53-00ee-4bf8-8156-d5bf8d80ba07",
+      "name": "Get Article Review Record",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1280,
+        1640
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "XEF45ga6YPLG0e3q"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "article_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Parse Review Decision').first().json.article_id }}"
+            }
+          ]
+        },
+        "returnAll": false,
+        "limit": 1
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "006520ef-4b34-45e5-b003-891f8ffe7da7",
+      "name": "Validate Review Decision",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1520,
+        1640
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const parsed = $('Parse Review Decision').first().json;\nconst row = $input.first().json || {};\nconst now = Date.now();\nlet allowed = false;\nlet response = '';\nlet nextReviewStatus = '';\nlet nextPublishStatus = '';\nif (!parsed.validArticleId) response = 'Please include the full article ID. Use /approve PB-ARTICLE_ID or /reject PB-ARTICLE_ID.';\nelse if (!row.article_id || String(row.article_id) !== parsed.article_id) response = 'I could not find that article ID in the Prismbyte review queue.';\nelse if (row.qa_status !== 'PASS' || row.review_status !== 'pending_review') response = 'This article is not eligible for a decision. Its QA status or review state is not eligible for approval/rejection.';\nelse if (!row.deadline_at || !Number.isFinite(Date.parse(row.deadline_at))) response = 'This article has no valid 12-hour review deadline and remains on hold.';\nelse if (now >= Date.parse(row.deadline_at)) response = 'The 12-hour review window has expired. This decision was not recorded.';\nelse {\n  allowed = true;\n  nextReviewStatus = parsed.decision === 'approve' ? 'approved' : 'rejected';\n  nextPublishStatus = parsed.decision === 'approve' ? 'approved_waiting_publish' : 'blocked_rejected';\n  response = parsed.decision === 'approve'\n    ? 'Approval recorded for ' + parsed.article_id + '. It is awaiting the publishing stage; it has NOT been published yet.'\n    : 'Rejection recorded for ' + parsed.article_id + '. It will not be published.';\n}\nreturn [{json:{allowed,response,article_id:parsed.article_id,chatId:parsed.chatId,decision:parsed.decision,review_status:nextReviewStatus,decision_at:new Date(now).toISOString(),decision_source:'telegram',publish_status:nextPublishStatus}}];"
+      }
+    },
+    {
+      "id": "5268d4a6-b865-4153-bed0-63de395a545f",
+      "name": "Decision Can Be Recorded?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1760,
+        1640
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.allowed ? 'yes' : 'no' }}",
+              "rightValue": "yes",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "62d4093c-17e3-4edf-b075-bc29d59618a6",
+      "name": "Update Article Review Decision",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2000,
+        1560
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "XEF45ga6YPLG0e3q"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "article_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.article_id }}"
+            },
+            {
+              "keyName": "review_status",
+              "condition": "eq",
+              "keyValue": "pending_review"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "review_status": "={{ $json.review_status }}",
+            "decision_at": "={{ $json.decision_at }}",
+            "decision_source": "={{ $json.decision_source }}",
+            "publish_status": "={{ $json.publish_status }}"
+          },
+          "schema": [
+            {
+              "id": "review_status",
+              "displayName": "review_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "decision_at",
+              "displayName": "decision_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "date",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "decision_source",
+              "displayName": "decision_source",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "publish_status",
+              "displayName": "publish_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ba2dbf84-7525-4f27-83c3-70a0f8aa3e20",
+      "name": "Reply Review Decision Saved",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2240,
+        1560
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $json.chatId }}",
+        "text": "={{ $json.response }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "disable_web_page_preview": true
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "q7UPlO6TvQBq87lT",
+          "name": "prismbyte telegram bot"
+        }
+      },
+      "webhookId": "49b547f9-7d5e-4d28-8e15-0bc4b3b07d1b"
+    },
+    {
+      "id": "64839102-828c-4633-8cc8-1610e24de49d",
+      "name": "Reply Review Decision Blocked",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2000,
+        1800
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $json.chatId }}",
+        "text": "={{ $json.response }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "disable_web_page_preview": true
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "q7UPlO6TvQBq87lT",
+          "name": "prismbyte telegram bot"
+        }
+      },
+      "webhookId": "10992269-2dfc-4461-b537-6af21d6cc750"
+    },
+    {
+      "id": "29c53451-1d47-4fb7-adcd-a6e0935c9430",
+      "name": "Reply Unauthorized Review Command",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1280,
+        1900
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $json.chatId }}",
+        "text": "This review command is only accepted from the configured Prismbyte private chat.",
+        "additionalFields": {
+          "appendAttribution": false,
+          "disable_web_page_preview": true
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "q7UPlO6TvQBq87lT",
+          "name": "prismbyte telegram bot"
+        }
+      },
+      "webhookId": "9f989172-5561-414f-9180-9c99dbbd1637"
+    },
+    {
+      "id": "71994481-35d2-483a-9e96-9d951ba309f4",
+      "name": "Build Review Notice",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2120,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const record = $('Prepare Article Review Queue Record').first().json;\nconst eligible = record.qa_status === 'PASS';\nconst noticeText = eligible\n ? 'PRISMBYTE — ARTICLE REVIEW\\n\\nArticle ID: ' + record.article_id + '\\nTopic: ' + record.topic + '\\nQA status: PASS\\n\\nThe 12-hour review window starts when this message is delivered.\\n\\nReply /approve ' + record.article_id + ' to approve, or /reject ' + record.article_id + ' to reject.\\n\\nIf there is no decision within 12 hours, the article may proceed to automatic publication only if all mandatory quality and deployment checks pass. Approval is recorded first; it does not mean the article is already live.'\n : 'PRISMBYTE — ARTICLE ON HOLD\\n\\nArticle ID: ' + record.article_id + '\\nTopic: ' + record.topic + '\\nQA status: ' + record.qa_status + '\\n\\nNo 12-hour review timer has started. This article will not auto-publish while QA is flagged or on HOLD. The issues must be resolved and the article must pass QA before it can enter review.';\nreturn [{json:{article_id:record.article_id,chatId:7392605484,noticeText}}];"
+      }
+    },
+    {
+      "id": "6f9a3e16-6af9-4460-813c-7c194a559025",
+      "name": "Send Review Decision Prompt",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2360,
+        300
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $json.chatId }}",
+        "text": "={{ $json.noticeText }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "disable_web_page_preview": true
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "q7UPlO6TvQBq87lT",
+          "name": "prismbyte telegram bot"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "webhookId": "eff3e8e0-8954-4230-bd47-254c1574f16c"
+    },
+    {
+      "id": "c43e52c0-5ff2-44db-beda-62936617302d",
+      "name": "Finalize Review Window",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2600,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const record = $('Prepare Article Review Queue Record').first().json;\nconst result = $input.first().json?.result || {};\nif (!Number.isInteger(result.message_id) || !Number.isFinite(Number(result.date))) throw new Error('Review notice delivery was not confirmed by Telegram; no review deadline was started.');\nconst sentAt = new Date(Number(result.date) * 1000);\nconst eligible = record.qa_status === 'PASS';\nconst deadline = eligible ? new Date(sentAt.getTime() + 12 * 60 * 60 * 1000) : null;\nconst ids = JSON.parse(record.telegram_message_ids || '[]');\nids.push(result.message_id);\nreturn [{json:{\n article_id:record.article_id,\n review_status:eligible ? 'pending_review' : 'hold_qa_flags',\n telegram_delivery_status:'delivered',\n telegram_message_ids:JSON.stringify(ids),\n review_sent_at:sentAt.toISOString(),\n deadline_at:deadline ? deadline.toISOString() : null,\n publish_status:eligible ? 'pending_review' : 'blocked_qa'\n}}];"
+      }
+    },
+    {
+      "id": "8c9b39a9-a80a-4233-b9e1-f06fef73e6b1",
+      "name": "Finalize Review Queue Record",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2840,
+        300
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "XEF45ga6YPLG0e3q"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "article_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.article_id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "review_status": "={{ $json.review_status }}",
+            "telegram_delivery_status": "={{ $json.telegram_delivery_status }}",
+            "telegram_message_ids": "={{ $json.telegram_message_ids }}",
+            "review_sent_at": "={{ $json.review_sent_at }}",
+            "deadline_at": "={{ $json.deadline_at }}",
+            "publish_status": "={{ $json.publish_status }}"
+          },
+          "schema": [
+            {
+              "id": "review_status",
+              "displayName": "review_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "telegram_delivery_status",
+              "displayName": "telegram_delivery_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "telegram_message_ids",
+              "displayName": "telegram_message_ids",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "review_sent_at",
+              "displayName": "review_sent_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "date",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "deadline_at",
+              "displayName": "deadline_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "date",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "publish_status",
+              "displayName": "publish_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "3e607dc7-cbca-4ac1-a2c1-92af3d6c6d73",
+      "name": "Build Decision Confirmation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2240,
+        1560
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const decision = $('Validate Review Decision').first().json;\nreturn [{json:{chatId:decision.chatId,response:decision.response}}];"
+      }
+    },
+    {
+      "id": "7f37cf39-6da2-4083-89f0-32ee322d76fe",
+      "name": "Fetch Published Article Index — Queue Guard",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1640,
+        300
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.github.com/repos/victorikaraoha23/prismbyte/contents/src/content/articles",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            },
+            {
+              "name": "X-GitHub-Api-Version",
+              "value": "2022-11-28"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "credentials": {
+        "githubApi": {
+          "id": "n7jUeXRd8ZbdEArn",
+          "name": "GitHub account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "8be8d9f8-0cae-438d-b493-bd0b8c587d93",
+      "name": "Get Existing Review Queue Slugs",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1880,
+        300
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "XEF45ga6YPLG0e3q"
+        },
+        "returnAll": true
+      },
+      "onError": "continueErrorOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "id": "0fd368f5-cc82-43ce-a46b-64c217e1ec3f",
+      "name": "Check Duplicate Article Slug",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2120,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const qa = $('Editorial QA — Verify Sources and Claims').first().json;\nconst raw = String(qa.output || qa.text || '').replace(/\\r\\n?/g, '\\n').trim();\nconst fence = String.fromCharCode(96).repeat(3);\nconst marker = fence + 'markdown';\nconst start = raw.indexOf(marker);\nconst contentStart = start >= 0 ? raw.indexOf('\\n', start + marker.length) + 1 : -1;\nconst end = contentStart > 0 ? raw.indexOf(fence, contentStart) : -1;\nconst article = end > contentStart ? raw.slice(contentStart, end).trim() : '';\nif (!article.startsWith('---\\n')) throw new Error('Duplicate check blocked: article frontmatter missing.');\nconst fmEnd = article.indexOf('\\n---', 4);\nif (fmEnd < 0) throw new Error('Duplicate check blocked: frontmatter closing delimiter missing.');\nconst frontmatter = article.slice(4, fmEnd);\nconst titleLine = frontmatter.split('\\n').find(line => line.startsWith('title:')) || '';\nconst title = titleLine.slice(6).trim().replace(/^[\"']|[\"']$/g, '');\nconst slug = title.toLowerCase().normalize('NFKD').replace(/[\\u0300-\\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');\nif (!slug) throw new Error('Duplicate check blocked: safe slug could not be derived.');\nconst repoItems = $('Fetch Published Article Index — Queue Guard').all();\nconst published = repoItems.map(x => x.json).filter(f => f && f.type === 'file' && typeof f.name === 'string' && /\\.mdx?$/i.test(f.name));\nif (!published.length) throw new Error('Duplicate check blocked: GitHub article index returned no Markdown files; refusing fail-open.');\nconst queued = $('Get Existing Review Queue Slugs').all().map(x => x.json).filter(r => r && typeof r.slug === 'string' && r.slug.trim());\nconst publishedMatch = published.find(f => f.name.replace(/\\.mdx?$/i,'') === slug);\nconst queueMatch = queued.find(r => String(r.slug).toLowerCase() === slug);\nif (publishedMatch || queueMatch) throw new Error('Duplicate article slug blocked: ' + slug + (publishedMatch ? ' already exists in published GitHub articles.' : ' already exists in the review queue.'));\nreturn [{json:{...qa,duplicateCheckPassed:true,qaPackagePreserved:true,slug,publishedArticleCount:published.length,reviewQueueRowsChecked:queued.length}}];"
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "8da11395-4950-4557-b150-90e79b25bd7a",
+      "name": "Wait — 12-Hour Review Deadline",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2200,
+        760
+      ],
+      "parameters": {
+        "resume": "specificTime",
+        "dateTime": "={{ $('Finalize Review Window').first().json.deadline_at }}"
+      },
+      "webhookId": "5c990817-7a5e-4950-8228-e3bb2122f90a"
+    },
+    {
+      "id": "ffff6ea6-d523-4337-ae93-63b20258bb9f",
+      "name": "Get Latest Article Review State — Timeout",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2420,
+        760
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "XEF45ga6YPLG0e3q"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "article_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Finalize Review Window').first().json.article_id }}"
+            }
+          ]
+        },
+        "returnAll": false,
+        "limit": 1
+      }
+    },
+    {
+      "id": "6f58a084-91d3-4793-9cf0-bda2dbc8e8b0",
+      "name": "Evaluate 12-Hour Timeout Eligibility",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2640,
+        760
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const row = $input.first()?.json || {};\nconst now = Date.now();\nconst deadline = Date.parse(row.deadline_at || '');\nconst sentAt = Date.parse(row.review_sent_at || '');\nconst ids = (() => { try { return JSON.parse(row.telegram_message_ids || '[]'); } catch { return []; } })();\nconst deliveryConfirmed = row.telegram_delivery_status === 'delivered' && Array.isArray(ids) && ids.length >= 2 && ids.every(Number.isInteger);\nconst flags = (() => { try { return JSON.parse(row.qa_flags_json || '{}'); } catch { return {}; } })();\nconst eligible = !!row.article_id && row.article_id !== 'PB-527' && row.qa_status === 'PASS' && flags.status === 'PASS' && flags.autoPublishEligible === true && row.review_status === 'pending_review' && row.publish_status === 'pending_review' && Number.isFinite(deadline) && Number.isFinite(sentAt) && deadline === sentAt + 12 * 60 * 60 * 1000 && now >= deadline && deliveryConfirmed;\nconst alreadyDecided = ['approved','rejected'].includes(String(row.review_status || '')) || ['approved_waiting_publish','blocked_rejected'].includes(String(row.publish_status || ''));\nreturn [{json:{article_id:row.article_id || '',timeoutEligible:eligible,alreadyDecided,qa_status:row.qa_status || '',review_status:row.review_status || '',publish_status:row.publish_status || '',deadline_at:row.deadline_at || '',review_sent_at:row.review_sent_at || '',reason:eligible?'12-hour review expired with no decision; exact PASS and delivery/deadline checks passed':alreadyDecided?'A review decision was already recorded; timeout cannot override it':'Timeout guard failed: QA, state, deadline, or Telegram delivery evidence is missing/invalid.'}}];"
+      }
+    },
+    {
+      "id": "6b58bdf7-8fa4-4fab-9b7a-0716fba75c66",
+      "name": "Timeout Eligible?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2860,
+        760
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.timeoutEligible ? 'yes' : 'no' }}",
+              "rightValue": "yes",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "56c6f1a8-d8ad-469d-8550-f1ad9e3cdd2a",
+      "name": "Mark Review Expired — Awaiting Publish Gate",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        3080,
+        680
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "XEF45ga6YPLG0e3q"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "article_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.article_id }}"
+            },
+            {
+              "keyName": "review_status",
+              "condition": "eq",
+              "keyValue": "pending_review"
+            },
+            {
+              "keyName": "qa_status",
+              "condition": "eq",
+              "keyValue": "PASS"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "review_status": "expired_no_response",
+            "publish_status": "expired_waiting_publish",
+            "last_error": ""
+          },
+          "schema": [
+            {
+              "id": "review_status",
+              "displayName": "review_status",
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "publish_status",
+              "displayName": "publish_status",
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "last_error",
+              "displayName": "last_error",
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "404cd848-8353-4358-b17f-e68743ed40ab",
+      "name": "Notify — Review Window Expired",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        3300,
+        680
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "7392605484",
+        "text": "={{ 'PRISMBYTE — REVIEW WINDOW EXPIRED\\n\\nArticle ID: ' + $('Evaluate 12-Hour Timeout Eligibility').first().json.article_id + '\\nThe 12-hour window expired with no decision. The timeout checks passed (QA PASS, confirmed delivery, valid deadline). It is now marked expired_waiting_publish. This is not yet a publication confirmation; the publishing/deployment gate must still pass.' }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "disable_web_page_preview": true
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "q7UPlO6TvQBq87lT",
+          "name": "prismbyte telegram bot"
+        }
+      },
+      "webhookId": "4afdb891-820f-438b-828b-ae67265ebb57"
+    },
+    {
+      "id": "bd3e77ae-bd94-4221-b414-0b6667ef0357",
+      "name": "Review Timer Should Start?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2200,
+        1040
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $('Finalize Review Window').first().json.review_status === 'pending_review' && !!$('Finalize Review Window').first().json.deadline_at }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "7d759097-ff0c-4d33-b024-e56570e84415",
+      "name": "Get Article Review Record — Approved Publish",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2200,
+        1280
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "XEF45ga6YPLG0e3q"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "article_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Validate Review Decision').first().json.article_id }}"
+            }
+          ]
+        },
+        "returnAll": false,
+        "limit": 1
+      }
+    },
+    {
+      "id": "3e9dab3b-d326-4ec2-baef-afd4bb65acde",
+      "name": "Get Article Review Record — Timeout Publish",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2200,
+        1520
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "XEF45ga6YPLG0e3q"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "article_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Evaluate 12-Hour Timeout Eligibility').first().json.article_id }}"
+            }
+          ]
+        },
+        "returnAll": false,
+        "limit": 1
+      }
+    },
+    {
+      "id": "ca616367-98b3-458c-bc46-34231bc29c3e",
+      "name": "Validate Article for Publication",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2440,
+        1400
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const row = $input.first()?.json || {};\nconst now = Date.now();\nconst nl = String.fromCharCode(10);\nconst today = new Intl.DateTimeFormat('en-CA',{timeZone:'Africa/Lagos',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());\nconst deadline = Date.parse(row.deadline_at || '');\nconst sentAt = Date.parse(row.review_sent_at || '');\nconst decidedAt = Date.parse(row.decision_at || '');\nconst ids = (() => { try { return JSON.parse(row.telegram_message_ids || '[]'); } catch { return []; } })();\nlet reason = '';\nconst qaFlags = (() => { try { return JSON.parse(row.qa_flags_json || '{}'); } catch { return {}; } })();\nconst approved = row.review_status === 'approved' && row.publish_status === 'approved_waiting_publish' && row.decision_source === 'telegram' && Number.isFinite(decidedAt) && Number.isFinite(deadline) && Number.isFinite(sentAt) && decidedAt >= sentAt && decidedAt <= deadline;\nconst timedOut = row.review_status === 'expired_no_response' && row.publish_status === 'expired_waiting_publish' && Number.isFinite(deadline) && Number.isFinite(sentAt) && now >= deadline;\nif (row.article_id === 'PB-527') reason = 'PB-527 was independently rejected and is permanently blocked from publication.';\nelse if (!row.article_id || !row.slug || !row.article_markdown) reason = 'Missing article ID, slug, or article Markdown.';\nelse if (row.qa_status !== 'PASS' || qaFlags.status !== 'PASS' || qaFlags.autoPublishEligible !== true) reason = 'Editorial QA is not exactly PASS with an explicit autoPublishEligible=true flag.';\nelse if (!approved && !timedOut) reason = 'Review decision or timeout state is not an eligible publish state.';\nelse if (row.telegram_delivery_status !== 'delivered' || !Array.isArray(ids) || ids.length < 2 || !ids.every(Number.isInteger)) reason = 'Telegram delivery evidence is incomplete.';\nelse if (!Number.isFinite(sentAt) || !Number.isFinite(deadline) || deadline !== sentAt + 12*60*60*1000) reason = 'Review deadline is invalid or is not exactly 12 hours after delivery.';\nelse if (row.published_commit || ['published','deploy_pending'].includes(String(row.publish_status))) reason = 'Article already has a publication/deployment record.';\nconst article = String(row.article_markdown || '').replace(/\\r\\n?/g,nl).trim();\nif (!reason && !article.startsWith('---' + nl)) reason = 'Article frontmatter is missing.';\nconst fmEnd = article.indexOf(nl + '---',4);\nif (!reason && fmEnd < 0) reason = 'Article frontmatter closing delimiter is missing.';\nconst fm = fmEnd >= 0 ? article.slice(4,fmEnd) : '';\nconst getLine = (key) => {\n  const re = new RegExp('^' + key + ':\\\\s*');\n  const line = fm.split(nl).find(value => re.test(value)) || '';\n  return line.replace(re,'').trim().replace(/^[\"']|[\"']$/g,'');\n};\nconst title = getLine('title');\nconst description = getLine('description');\nconst publishDate = getLine('publishDate');\nconst category = getLine('category').replace(/^[\"']|[\"']$/g,'');\nconst draftLine = fm.split(nl).find(line => /^draft:\\s*/.test(line)) || '';\nconst slugFromTitle = title.toLowerCase().normalize('NFKD').replace(/[\\u0300-\\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');\nif (!reason && (!title || !description || !publishDate || !['ai-saas','automation','troubleshooting'].includes(category))) reason = 'Required Astro article frontmatter is incomplete or category is invalid.';\nif (!reason && publishDate !== today) reason = 'Article publishDate is not today in Africa/Lagos ('+today+'); stale articles are held.';\nif (!reason && draftLine !== 'draft: true') reason = 'QA article must remain draft:true until the guarded publication step.';\nif (!reason && slugFromTitle !== row.slug) reason = 'Queue slug does not match the article title.';\nif (!reason && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(row.slug)) reason = 'Slug contains unsupported characters.';\nconst publishMarkdown = !reason ? article.replace(/^draft:\\s*true\\s*$/m,'draft: false') : '';\nif (!reason && publishMarkdown === article) reason = 'Could not safely switch the article from draft:true to draft:false.';\nreturn [{json:{article_id:row.article_id || '',slug:row.slug || '',title,article_markdown:article,publish_markdown:publishMarkdown,publishEligible:!reason,reason,review_status:row.review_status || '',qa_status:row.qa_status || '',publish_status:row.publish_status || ''}}];"
+      }
+    },
+    {
+      "id": "bfec80fc-6fbf-4d44-9b39-4a4b571503da",
+      "name": "Publication Guard Passed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2660,
+        1400
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.publishEligible ? 'yes' : 'no' }}",
+              "rightValue": "yes",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "48ca81f5-3f24-4ca6-a182-79578c9d8637",
+      "name": "Fetch Published Index — Final Publish Guard",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        2880,
+        1280
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.github.com/repos/victorikaraoha23/prismbyte/contents/src/content/articles",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            },
+            {
+              "name": "X-GitHub-Api-Version",
+              "value": "2022-11-28"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "credentials": {
+        "githubApi": {
+          "id": "n7jUeXRd8ZbdEArn",
+          "name": "GitHub account"
+        }
+      },
+      "onError": "continueErrorOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000
+    },
+    {
+      "id": "edd6bff8-3998-4a35-a3eb-33209e4eb16a",
+      "name": "Check Published Slug Available",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3100,
+        1280
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const record = $('Validate Article for Publication').first().json;\nconst rows = $input.all().map(item => item.json || {});\nconst names = rows.map(row => row.name).filter(name => typeof name === 'string');\nconst validListing = rows.length > 0 && names.length === rows.length;\nconst duplicate = names.some(name => name === record.slug + '.md' || name === record.slug + '.mdx');\nreturn [{json:{...record,slugAvailable:validListing && !duplicate,duplicate,listingValid:validListing,reason:!validListing?'GitHub article index could not be verified; publication blocked.':duplicate?'An article with this slug already exists in GitHub.': ''}}];"
+      }
+    },
+    {
+      "id": "34fd6978-4ea1-456c-bd2c-71b89af50b63",
+      "name": "Published Slug Available?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        3320,
+        1280
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.slugAvailable ? 'yes' : 'no' }}",
+              "rightValue": "yes",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "6fb30194-eab5-4297-9c97-b87d34495396",
+      "name": "Create Article Markdown on Main",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1.1,
+      "position": [
+        3540,
+        1160
+      ],
+      "parameters": {
+        "resource": "file",
+        "operation": "create",
+        "authentication": "accessToken",
+        "owner": {
+          "__rl": true,
+          "mode": "name",
+          "value": "victorikaraoha23"
+        },
+        "repository": {
+          "__rl": true,
+          "mode": "name",
+          "value": "prismbyte"
+        },
+        "filePath": "={{ 'src/content/articles/' + $('Validate Article for Publication').first().json.slug + '.md' }}",
+        "binaryData": false,
+        "fileContent": "={{ $('Validate Article for Publication').first().json.publish_markdown }}",
+        "commitMessage": "={{ 'Publish article: ' + $('Validate Article for Publication').first().json.title }}",
+        "additionalParameters": {
+          "branch": {
+            "branch": "main"
+          }
+        }
+      },
+      "credentials": {
+        "githubApi": {
+          "id": "n7jUeXRd8ZbdEArn",
+          "name": "GitHub account"
+        }
+      },
+      "webhookId": "964b544c-f874-47ee-a158-c5512f8d8d7d",
+      "onError": "continueErrorOutput",
+      "retryOnFail": false,
+      "maxTries": 3,
+      "waitBetweenTries": 3000
+    },
+    {
+      "id": "8f6f7de5-06b6-4415-a96a-56dfe5607e47",
+      "name": "Mark Article Deployment Pending",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        3760,
+        1160
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "XEF45ga6YPLG0e3q"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "article_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Validate Article for Publication').first().json.article_id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "publish_status": "deploy_pending",
+            "published_commit": "={{ $json.commit.sha }}",
+            "published_url": "",
+            "last_error": ""
+          },
+          "schema": [
+            {
+              "id": "publish_status",
+              "displayName": "publish_status",
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "published_commit",
+              "displayName": "published_commit",
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "published_url",
+              "displayName": "published_url",
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "last_error",
+              "displayName": "last_error",
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "3fb2d89e-b0ae-4720-aef0-8fc224d80b93",
+      "name": "Wait — 30 Seconds Before Deploy Check",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        3980,
+        1160
+      ],
+      "parameters": {
+        "resume": "timeInterval",
+        "amount": 30,
+        "unit": "seconds"
+      },
+      "webhookId": "18669d1a-0d08-449e-ac36-bed635f4150f"
+    },
+    {
+      "id": "2308f1a9-f1cc-4455-83a1-61ac349d62e5",
+      "name": "Fetch Cloudflare Deployment Run",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        4200,
+        1160
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.github.com/repos/victorikaraoha23/prismbyte/actions/runs",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubApi",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "head_sha",
+              "value": "={{ $('Create Article Markdown on Main').first().json.commit.sha }}"
+            },
+            {
+              "name": "per_page",
+              "value": "10"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            },
+            {
+              "name": "X-GitHub-Api-Version",
+              "value": "2022-11-28"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "credentials": {
+        "githubApi": {
+          "id": "n7jUeXRd8ZbdEArn",
+          "name": "GitHub account"
+        }
+      },
+      "onError": "continueErrorOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000
+    },
+    {
+      "id": "5ea656a9-4d9b-442a-8b72-ac8d360910ad",
+      "name": "Evaluate Cloudflare Deployment Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4420,
+        1160
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const body = $input.first()?.json || {};\nconst sha = $('Create Article Markdown on Main').first().json.commit.sha;\nconst slug = $('Validate Article for Publication').first().json.slug;\nconst articleId = $('Validate Article for Publication').first().json.article_id;\nconst data = $getWorkflowStaticData('global');\nconst key = 'prismbyte_deploy_poll_' + sha;\ndata[key] = Number(data[key] || 0) + 1;\nconst attempt = data[key];\nconst runs = Array.isArray(body.workflow_runs) ? body.workflow_runs : [];\nconst run = runs.find(item => item.head_sha === sha && item.name === 'Prismbyte — Build and Deploy to Cloudflare');\nlet state = 'pending';\nlet reason = 'The matching GitHub Actions deployment run has not appeared yet.';\nif (run?.status === 'completed') {\n  if (run.conclusion === 'success') { state = 'success'; reason = 'GitHub Actions build and Cloudflare deployment completed successfully.'; }\n  else { state = 'failed'; reason = 'GitHub Actions deployment completed with conclusion: ' + String(run.conclusion || 'unknown') + '.'; }\n} else if (run) reason = 'GitHub Actions deployment is still ' + String(run.status || 'in progress') + '.';\nconst pollAgain = state === 'pending' && attempt < 10;\nif (state !== 'pending' || !pollAgain) delete data[key];\nreturn [{json:{article_id:articleId,slug,commit_sha:sha,attempt,state,reason,pollAgain,deploymentSucceeded:state === 'success',deploymentFailed:state === 'failed',published_url:'https://prismbyte.site/blog/' + slug + '/'}}];"
+      }
+    },
+    {
+      "id": "95b956e4-1436-4c33-b697-d16c99de7afa",
+      "name": "Deployment Poll Again?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        4640,
+        1160
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.pollAgain ? 'yes' : 'no' }}",
+              "rightValue": "yes",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "d4cc214e-7e12-44ee-9f60-3d8155ae4c0d",
+      "name": "Deployment Successful?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        4860,
+        1280
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.deploymentSucceeded ? 'yes' : 'no' }}",
+              "rightValue": "yes",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "66e83c05-d611-49e1-9830-e73873a462e9",
+      "name": "Mark Article Published",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        5080,
+        1160
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "XEF45ga6YPLG0e3q"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "article_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.article_id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "publish_status": "published",
+            "published_commit": "={{ $json.commit_sha }}",
+            "published_url": "={{ $json.published_url }}",
+            "last_error": ""
+          },
+          "schema": [
+            {
+              "id": "publish_status",
+              "displayName": "publish_status",
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "published_commit",
+              "displayName": "published_commit",
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "published_url",
+              "displayName": "published_url",
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "last_error",
+              "displayName": "last_error",
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "a3f99467-7394-4c97-802d-cf74efcbc138",
+      "name": "Notify — Article Published",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        5300,
+        1160
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "7392605484",
+        "text": "={{ 'PRISMBYTE — ARTICLE PUBLISHED\\n\\nArticle ID: ' + $('Evaluate Cloudflare Deployment Result').first().json.article_id + '\\nURL: ' + $('Evaluate Cloudflare Deployment Result').first().json.published_url + '\\nCommit: ' + $('Evaluate Cloudflare Deployment Result').first().json.commit_sha + '\\n\\nGitHub Actions confirms the build and Cloudflare deployment completed successfully.' }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "disable_web_page_preview": true
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "q7UPlO6TvQBq87lT",
+          "name": "prismbyte telegram bot"
+        }
+      },
+      "webhookId": "270159bf-9a6e-4b6a-9261-48563eaff8e6"
+    },
+    {
+      "id": "9d33764f-52e2-4140-bf19-df045f13f4f8",
+      "name": "Mark Deployment Not Confirmed",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        5080,
+        1400
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "XEF45ga6YPLG0e3q"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "article_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.article_id || $('Validate Article for Publication').first().json.article_id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "publish_status": "={{ $json.state === 'failed' ? 'deploy_failed' : 'deploy_verification_pending' }}",
+            "published_commit": "={{ $json.commit_sha || $('Create Article Markdown on Main').first().json.commit.sha }}",
+            "last_error": "={{ $json.reason || $json.error?.message || 'Live URL verification did not confirm a successful public article response.' }}"
+          },
+          "schema": [
+            {
+              "id": "publish_status",
+              "displayName": "publish_status",
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "published_commit",
+              "displayName": "published_commit",
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "last_error",
+              "displayName": "last_error",
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "a9163725-c7b0-49e8-8218-66bf7175d253",
+      "name": "Notify — Deployment Not Confirmed",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        5300,
+        1400
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "7392605484",
+        "text": "={{ 'PRISMBYTE — DEPLOYMENT NOT CONFIRMED\\n\\nArticle ID: ' + $('Validate Article for Publication').first().json.article_id + '\\nCommit: ' + $('Create Article Markdown on Main').first().json.commit.sha + '\\nThe GitHub Actions status check or public article URL check did not complete successfully. The article has NOT been marked published. Check the review queue last_error and the GitHub Actions run before retrying.' }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "disable_web_page_preview": true
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "q7UPlO6TvQBq87lT",
+          "name": "prismbyte telegram bot"
+        }
+      },
+      "webhookId": "3606642f-bc97-4885-930b-4b87d3c8e137"
+    },
+    {
+      "id": "720b1d63-a338-428a-9780-56704f5ec734",
+      "name": "Mark Publication Guard Blocked",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        3540,
+        1560
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "XEF45ga6YPLG0e3q"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "article_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Validate Article for Publication').first().json.article_id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "publish_status": "blocked_publish_guard",
+            "last_error": "={{ $json.reason || $json.error?.message || $json.message || 'Publication guard failed or the GitHub article index could not be verified.' }}"
+          },
+          "schema": [
+            {
+              "id": "publish_status",
+              "displayName": "publish_status",
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "last_error",
+              "displayName": "last_error",
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "4cc08c2f-dbd7-4286-a3a4-1ef9fd019dbd",
+      "name": "Notify — Publication Held",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        3760,
+        1560
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "7392605484",
+        "text": "={{ 'PRISMBYTE — PUBLICATION HELD\\n\\nArticle ID: ' + $('Validate Article for Publication').first().json.article_id + '\\nNo GitHub article commit was made. The publication guard failed; inspect last_error in the review queue for the exact reason.' }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "disable_web_page_preview": true
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "q7UPlO6TvQBq87lT",
+          "name": "prismbyte telegram bot"
+        }
+      },
+      "webhookId": "52c20cab-1235-456e-b760-577547b2ec84"
+    },
+    {
+      "id": "68f57802-ecd2-4563-9697-9a29e95dffc8",
+      "name": "Verify Live Article URL",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        5080,
+        960
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Evaluate Cloudflare Deployment Result').first().json.published_url }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "text"
+            }
+          },
+          "timeout": 20000
+        }
+      },
+      "onError": "continueErrorOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000
+    },
+    {
+      "id": "74b8c15f-71b3-4889-a566-917b3c869830",
+      "name": "Evaluate Live Article Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5300,
+        960
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const response = $input.first()?.json || {};\nconst deployment = $('Evaluate Cloudflare Deployment Result').first().json;\nconst statusCode = Number(response.statusCode || 0);\nconst body = String(response.body || response.data || '');\nconst canonicalPath = '/blog/' + deployment.slug + '/';\nconst liveVerified = statusCode === 200 && body.includes(canonicalPath);\nconst state = liveVerified ? 'success' : (statusCode >= 500 ? 'failed' : 'pending');\nconst reason = liveVerified ? 'The public article URL returned HTTP 200 and the expected canonical path.' : 'Live article URL verification did not pass (HTTP ' + String(statusCode || 'unknown') + '); the article will not be marked published.';\nreturn [{json:{...deployment,liveVerified,state,reason}}];"
+      }
+    },
+    {
+      "id": "84c31d57-a695-4afd-a997-f387c93e5762",
+      "name": "Live Article Verified?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        5520,
+        960
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.liveVerified ? 'yes' : 'no' }}",
+              "rightValue": "yes",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "300228fa-5b7f-4a1a-a818-3a93abdb9d5d",
+      "name": "Mark GitHub Commit Unconfirmed",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        3760,
+        1760
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "XEF45ga6YPLG0e3q"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "article_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Validate Article for Publication').first().json.article_id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "publish_status": "publish_commit_unconfirmed",
+            "last_error": "={{ $json.error?.message || $json.message || 'GitHub did not return a confirmed file-create result; check the repository before retrying.' }}"
+          },
+          "schema": [
+            {
+              "id": "publish_status",
+              "displayName": "publish_status",
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "last_error",
+              "displayName": "last_error",
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "f1462006-0aef-4d75-8322-806a8dbcc4c4",
+      "name": "Notify — GitHub Commit Unconfirmed",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        3980,
+        1760
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "7392605484",
+        "text": "={{ 'PRISMBYTE — GITHUB COMMIT UNCONFIRMED\\n\\nArticle ID: ' + $('Validate Article for Publication').first().json.article_id + '\\nGitHub did not return a confirmed file-create result. The commit may or may not have been accepted. Do not retry yet: check src/content/articles/' + $('Validate Article for Publication').first().json.slug + '.md on the main branch first. The article has not been marked published.' }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "disable_web_page_preview": true
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "q7UPlO6TvQBq87lT",
+          "name": "prismbyte telegram bot"
+        }
+      },
+      "webhookId": "d80423b6-ca7c-4827-8157-1a0a2078c9ac"
+    },
+    {
+      "id": "d4159c6d-d846-4f5d-9017-55a3bd71eab6",
+      "name": "Evaluate QA Revision State",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -640,
+        520
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const item = $input.first().json;\nconst status = String(item.qaStatus || 'MISSING').trim().toUpperCase();\nconst structurallyValid = item.qaGatePassed === true;\nconst passed = structurallyValid && status === 'PASS';\nconst state = $getWorkflowStaticData('global');\nconst key = 'prismbyte_qa_revision_' + String($execution.id);\nlet revisionsUsed = Number(state[key] || 0);\nif (passed) {\n  delete state[key];\n  return [{json:{...item,qaPassed:true,qaRetryAllowed:false,qaRevisionsUsed:revisionsUsed,qaDecision:'PASS'}}];\n}\nrevisionsUsed += 1;\nstate[key] = revisionsUsed;\nconst reason = [\n  item.qaGateReason || '',\n  status !== 'PASS' ? 'Reviewer status is ' + status + '; only exact PASS is accepted.' : '',\n  'Revision attempt ' + revisionsUsed + ' of 3.'\n].filter(Boolean).join(' ');\nreturn [{json:{...item,qaPassed:false,qaRetryAllowed:revisionsUsed <= 3,qaRevisionsUsed:revisionsUsed,qaDecision:revisionsUsed <= 3 ? 'REVISE' : 'HOLD',qaRevisionReason:reason}}];"
+      }
+    },
+    {
+      "id": "f10f753b-09d9-41ea-97af-f2ecc7a67213",
+      "name": "QA Passed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -400,
+        520
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.qaPassed ? 'yes' : 'no' }}",
+              "rightValue": "yes",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "3d7cac58-8acf-49c2-b727-7898ec651174",
+      "name": "QA Revision Available?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -160,
+        700
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.qaRetryAllowed ? 'yes' : 'no' }}",
+              "rightValue": "yes",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "03f7b521-77e5-4bc7-b08a-db30ffa53445",
+      "name": "Prepare QA Revision Instructions",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        80,
+        700
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const item = $input.first().json;\nconst reviewerReport = String(item.output || item.text || '').trim();\nif (!reviewerReport) throw new Error('QA revision blocked: reviewer report is missing.');\nconst topic = String($('Load Pending Draft').first().json.topic || '').trim();\nconst attempt = Number(item.qaRevisionsUsed || 1);\nconst gateReason = String(item.qaGateReason || '').trim();\nconst revisionPrompt = [\n  'You are NVIDIA Nemotron acting as Prismbyte\\'s article revision writer. An independent editorial reviewer rejected or flagged the previous draft.',\n  'TOPIC: ' + topic,\n  'REVISION ATTEMPT: ' + attempt + ' of 3',\n  gateReason ? 'STRUCTURAL GATE FINDING: ' + gateReason : '',\n  '',\n  'FULL INDEPENDENT REVIEWER REPORT AND CORRECTION LEDGER:',\n  reviewerReport,\n  '',\n  'MANDATORY REVISION INSTRUCTIONS:',\n  '- Read every reviewer finding and correction. Apply every requested correction in the article itself, not just in commentary.',\n  '- Correct facts, current product/model names, prices, billing periods, integrations, technical details, source claims, SEO, internal-link recommendations and Astro frontmatter wherever applicable.',\n  '- Re-research disputed or time-sensitive claims using the connected Tavily tool. Prefer current official primary sources. Do not claim a URL was retrieved unless Tavily actually retrieved it.',\n  '- Remove unsupported claims and unverifiable prices/features instead of guessing. Clearly identify any remaining uncertainty for the reviewer.',\n  '- Check that corrected information is consistent in every paragraph, table, example, FAQ, metadata field and source note. Remove obsolete model names and conflicting figures.',\n  '- Preserve the article\\'s valid search intent and useful content. Do not rewrite unrelated sections merely for variation.',\n  '- Produce one complete canonical article, not a diff, summary, patch, or multiple alternatives.',\n  '- Use valid Prismbyte Astro frontmatter only: title, description, publishDate, optional updatedDate, category (ai-saas|automation|troubleshooting), tags, author, featuredImage, featuredImageAlt, imageSource, draft, sources, affiliateDisclosure. Always draft: true. Do not add slug, seoTitle or focusKeyword.',\n  '- publishDate must be today in Africa/Lagos. The QA stage will independently validate it.',\n  '- The sources array must contain only URLs you actually retrieved and that support claims. Do not invent internal Prismbyte URLs, affiliate relationships, product testing or experience.',\n  '- Return a short revision summary, then ONE fenced markdown block containing the full saveable article, then source/revision notes and a human-review checklist.',\n  '- Label DRAFT FOR INDEPENDENT EDITORIAL RE-REVIEW — NOT FOR PUBLICATION.',\n  '- Do not publish, commit, push, deploy, or contact Telegram.',\n  '',\n  'The independent QA reviewer will re-check your complete revised package. Do not declare your own work PASS.'\n].filter(Boolean).join('\\n');\nreturn [{json:{...item,revisionPrompt,qaRevisionAttempt:attempt,topic}}];"
+      }
+    },
+    {
+      "id": "69db0901-2c51-4946-a276-4e7dfa352b81",
+      "name": "NVIDIA — Revise Article from QA",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        340,
+        700
+      ],
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.revisionPrompt }}",
+        "options": {
+          "systemMessage": "You are NVIDIA Nemotron, Prismbyte's revision writer. Follow the independent Editorial QA report precisely. Research corrections with the connected Tavily tool, prioritize official current sources, and never invent facts or retrieval. Return one complete, copy-ready Astro Markdown article package using the supported Prismbyte schema, with draft:true and today's Africa/Lagos publishDate. Apply corrections consistently throughout. If evidence cannot support a claim, remove or qualify it and tell the reviewer. Do not self-approve, publish, commit, push, deploy, or send Telegram messages. Your output goes back to an independent QA agent for a fresh review.",
+          "maxIterations": 8,
+          "returnIntermediateSteps": false
+        }
+      },
+      "onError": "continueErrorOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000
+    },
+    {
+      "id": "4d99231e-eb1a-41f3-9a9a-8464fd53fd99",
+      "name": "Notify QA Revision Limit",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        100,
+        940
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $('Telegram Trigger').first().json.message.chat.id }}",
+        "text": "={{ 'PRISMBYTE — ARTICLE HELD AFTER EDITORIAL REVIEW\\n\\nTopic: ' + String($('Load Pending Draft').first().json.topic || 'Unknown') + '\\nReviewer status: ' + String($json.qaStatus || 'MISSING') + '\\nRevision attempts completed: 3\\n\\nThe independent reviewer did not return an exact PASS after three NVIDIA revision attempts. The article was not added to the review queue, no 12-hour timer was started, and nothing was published.\\n\\nLatest reviewer findings:\\n' + String($json.output || $json.text || $json.qaGateReason || 'No reviewer details were returned.').slice(0,3000) }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "disable_web_page_preview": true
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "q7UPlO6TvQBq87lT",
+          "name": "prismbyte telegram bot"
+        }
+      },
+      "webhookId": "8030d9bd-0f8b-4d31-bfaa-54c97a1fd5c7"
+    }
+  ],
+  "connections": {
+    "Format Draft Messages": {
+      "main": [
+        [
+          {
+            "node": "Send Draft to Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reply — Draft Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Route Telegram Command",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Telegram Command": {
+      "main": [
+        [
+          {
+            "node": "Reply — Start and Help",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reply — Start and Help",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Save Pending Draft",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Load Pending Draft",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Clear Pending Draft",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Parse Review Decision",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Parse Review Decision",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle Topic Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "NVIDIA Nemotron — Article Research": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Research and Draft Article",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Editorial QA — Verify Sources and Claims",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "NVIDIA — Revise Article from QA",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tavily — Live Web Research": {
+      "ai_tool": [
+        [
+          {
+            "node": "Research and Draft Article",
+            "type": "ai_tool",
+            "index": 0
+          },
+          {
+            "node": "Editorial QA — Verify Sources and Claims",
+            "type": "ai_tool",
+            "index": 0
+          },
+          {
+            "node": "NVIDIA — Revise Article from QA",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Research and Draft Article": {
+      "main": [
+        [
+          {
+            "node": "Inject Current WAT Date",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reply — Draft Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reply — Draft Started": {
+      "main": [
+        [
+          {
+            "node": "Research and Draft Article",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Editorial QA — Verify Sources and Claims": {
+      "main": [
+        [
+          {
+            "node": "QA Package Gate",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reply — Draft Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Pending Draft": {
+      "main": [
+        [
+          {
+            "node": "Has Pending Draft?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Pending Draft?": {
+      "main": [
+        [
+          {
+            "node": "Reply — Draft Started",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reply — Unknown Command",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clear Pending Draft": {
+      "main": [
+        [
+          {
+            "node": "Reply — Unknown Command",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Pending Draft": {
+      "main": [
+        [
+          {
+            "node": "Reply — Unknown Command",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle Topic Reply": {
+      "main": [
+        [
+          {
+            "node": "Reply — Unknown Command",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Inject Current WAT Date": {
+      "main": [
+        [
+          {
+            "node": "Editorial QA — Verify Sources and Claims",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Article Review Queue Record": {
+      "main": [
+        [
+          {
+            "node": "Persist Article Review Queue",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reply — Draft Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Review Decision": {
+      "main": [
+        [
+          {
+            "node": "Authorized Review Chat?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Authorized Review Chat?": {
+      "main": [
+        [
+          {
+            "node": "Get Article Review Record",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reply Unauthorized Review Command",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Article Review Record": {
+      "main": [
+        [
+          {
+            "node": "Validate Review Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Review Decision": {
+      "main": [
+        [
+          {
+            "node": "Decision Can Be Recorded?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Decision Can Be Recorded?": {
+      "main": [
+        [
+          {
+            "node": "Update Article Review Decision",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reply Review Decision Blocked",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Persist Article Review Queue": {
+      "main": [
+        [
+          {
+            "node": "Build Review Notice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Review Notice": {
+      "main": [
+        [
+          {
+            "node": "Send Review Decision Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Review Decision Prompt": {
+      "main": [
+        [
+          {
+            "node": "Finalize Review Window",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Finalize Review Window": {
+      "main": [
+        [
+          {
+            "node": "Finalize Review Queue Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Article Review Decision": {
+      "main": [
+        [
+          {
+            "node": "Build Decision Confirmation",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get Article Review Record — Approved Publish",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Decision Confirmation": {
+      "main": [
+        [
+          {
+            "node": "Reply Review Decision Saved",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Published Article Index — Queue Guard": {
+      "main": [
+        [
+          {
+            "node": "Get Existing Review Queue Slugs",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reply — Draft Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Existing Review Queue Slugs": {
+      "main": [
+        [
+          {
+            "node": "Check Duplicate Article Slug",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reply — Draft Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Duplicate Article Slug": {
+      "main": [
+        [
+          {
+            "node": "Format Draft Messages",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reply — Draft Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Draft to Telegram": {
+      "main": [
+        [
+          {
+            "node": "Prepare Article Review Queue Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Finalize Review Queue Record": {
+      "main": [
+        [
+          {
+            "node": "Review Timer Should Start?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait — 12-Hour Review Deadline": {
+      "main": [
+        [
+          {
+            "node": "Get Latest Article Review State — Timeout",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Latest Article Review State — Timeout": {
+      "main": [
+        [
+          {
+            "node": "Evaluate 12-Hour Timeout Eligibility",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Evaluate 12-Hour Timeout Eligibility": {
+      "main": [
+        [
+          {
+            "node": "Timeout Eligible?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Timeout Eligible?": {
+      "main": [
+        [
+          {
+            "node": "Mark Review Expired — Awaiting Publish Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Review Expired — Awaiting Publish Gate": {
+      "main": [
+        [
+          {
+            "node": "Notify — Review Window Expired",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get Article Review Record — Timeout Publish",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Review Timer Should Start?": {
+      "main": [
+        [
+          {
+            "node": "Wait — 12-Hour Review Deadline",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Article Review Record — Approved Publish": {
+      "main": [
+        [
+          {
+            "node": "Validate Article for Publication",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Article Review Record — Timeout Publish": {
+      "main": [
+        [
+          {
+            "node": "Validate Article for Publication",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Article for Publication": {
+      "main": [
+        [
+          {
+            "node": "Publication Guard Passed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Publication Guard Passed?": {
+      "main": [
+        [
+          {
+            "node": "Fetch Published Index — Final Publish Guard",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark Publication Guard Blocked",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Published Index — Final Publish Guard": {
+      "main": [
+        [
+          {
+            "node": "Check Published Slug Available",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark Publication Guard Blocked",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Published Slug Available": {
+      "main": [
+        [
+          {
+            "node": "Published Slug Available?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Published Slug Available?": {
+      "main": [
+        [
+          {
+            "node": "Create Article Markdown on Main",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark Publication Guard Blocked",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Article Markdown on Main": {
+      "main": [
+        [
+          {
+            "node": "Mark Article Deployment Pending",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark GitHub Commit Unconfirmed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Article Deployment Pending": {
+      "main": [
+        [
+          {
+            "node": "Wait — 30 Seconds Before Deploy Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait — 30 Seconds Before Deploy Check": {
+      "main": [
+        [
+          {
+            "node": "Fetch Cloudflare Deployment Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Cloudflare Deployment Run": {
+      "main": [
+        [
+          {
+            "node": "Evaluate Cloudflare Deployment Result",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark Deployment Not Confirmed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Evaluate Cloudflare Deployment Result": {
+      "main": [
+        [
+          {
+            "node": "Deployment Poll Again?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Deployment Poll Again?": {
+      "main": [
+        [
+          {
+            "node": "Wait — 30 Seconds Before Deploy Check",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Deployment Successful?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Deployment Successful?": {
+      "main": [
+        [
+          {
+            "node": "Verify Live Article URL",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark Deployment Not Confirmed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Article Published": {
+      "main": [
+        [
+          {
+            "node": "Notify — Article Published",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Deployment Not Confirmed": {
+      "main": [
+        [
+          {
+            "node": "Notify — Deployment Not Confirmed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Publication Guard Blocked": {
+      "main": [
+        [
+          {
+            "node": "Notify — Publication Held",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Live Article URL": {
+      "main": [
+        [
+          {
+            "node": "Evaluate Live Article Response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark Deployment Not Confirmed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Evaluate Live Article Response": {
+      "main": [
+        [
+          {
+            "node": "Live Article Verified?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Live Article Verified?": {
+      "main": [
+        [
+          {
+            "node": "Mark Article Published",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark Deployment Not Confirmed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark GitHub Commit Unconfirmed": {
+      "main": [
+        [
+          {
+            "node": "Notify — GitHub Commit Unconfirmed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "QA Package Gate": {
+      "main": [
+        [
+          {
+            "node": "Evaluate QA Revision State",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Evaluate QA Revision State": {
+      "main": [
+        [
+          {
+            "node": "QA Passed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "QA Passed?": {
+      "main": [
+        [
+          {
+            "node": "Fetch Published Article Index — Queue Guard",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "QA Revision Available?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "QA Revision Available?": {
+      "main": [
+        [
+          {
+            "node": "Prepare QA Revision Instructions",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Notify QA Revision Limit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare QA Revision Instructions": {
+      "main": [
+        [
+          {
+            "node": "NVIDIA — Revise Article from QA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "NVIDIA — Revise Article from QA": {
+      "main": [
+        [
+          {
+            "node": "Inject Current WAT Date",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reply — Draft Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "saveExecutionProgress": true,
+    "saveDataErrorExecution": "all"
+  }
+}
