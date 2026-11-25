@@ -1,0 +1,100 @@
+{
+  "name": "Prismbyte — Isolated Native GitHub Rollback Test",
+  "nodes": [
+    {
+      "id": "8bacf335-a213-46ee-96a2-05d8120c270d",
+      "name": "Start Isolated GitHub Node Test",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "a8fea1bd-09f3-4db7-8338-fba83e9f7b4f",
+      "name": "Prepare Draft Restoration Fixture",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "return [{json:{fileContent:\"---\\ntitle: \\\"Prismbyte WF-01 GitHub Node Test — DO NOT PUBLISH\\\"\\ndescription: \\\"Synthetic integration fixture for testing the native n8n GitHub node on a temporary branch only.\\\"\\npublishDate: 2026-11-23\\ncategory: \\\"automation\\\"\\ndraft: true\\n---\\n\\n# Prismbyte WF-01 GitHub Node Test\\n\\n> **TEST FIXTURE — DO NOT PUBLISH.** This file must never be merged into main or published.\\n\\nNative n8n GitHub node runtime test: restoration to draft:true.\\n\"}}];"
+      }
+    },
+    {
+      "id": "d1044622-c7ce-45b0-91fc-a3ddcdc27d0b",
+      "name": "Restore Test Fixture to Draft via Native GitHub Node",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1.1,
+      "position": [
+        448,
+        0
+      ],
+      "parameters": {
+        "resource": "file",
+        "operation": "edit",
+        "authentication": "accessToken",
+        "owner": {
+          "__rl": true,
+          "mode": "name",
+          "value": "victorikaraoha23"
+        },
+        "repository": {
+          "__rl": true,
+          "mode": "name",
+          "value": "prismbyte"
+        },
+        "filePath": "src/content/articles/prismbyte-wf01-github-node-test-do-not-publish.md",
+        "binaryData": false,
+        "fileContent": "={{ $json.fileContent }}",
+        "commitMessage": "Isolated n8n native GitHub node test: restore draft:true",
+        "additionalParameters": {
+          "branch": {
+            "branch": "automation/wf01-isolated-test-20261123"
+          }
+        }
+      },
+      "credentials": {
+        "githubApi": {
+          "id": "n7jUeXRd8ZbdEArn",
+          "name": "GitHub account"
+        }
+      },
+      "webhookId": "6d91f0db-ffa6-4359-a42c-5cbfb8189883"
+    }
+  ],
+  "connections": {
+    "Start Isolated GitHub Node Test": {
+      "main": [
+        [
+          {
+            "node": "Prepare Draft Restoration Fixture",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Draft Restoration Fixture": {
+      "main": [
+        [
+          {
+            "node": "Restore Test Fixture to Draft via Native GitHub Node",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  }
+}
