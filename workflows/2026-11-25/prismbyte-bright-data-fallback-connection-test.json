@@ -1,0 +1,144 @@
+{
+  "name": "Prismbyte — Bright Data Fallback Connection Test",
+  "nodes": [
+    {
+      "id": "e926fa15-7b46-4997-abec-f5ec1731623a",
+      "name": "Start Bright Data Search Test",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "ed350ff4-25c2-495a-99a9-92b5c82a2336",
+      "name": "Bright Data Google Search",
+      "type": "@brightdata/n8n-nodes-brightdata.brightData",
+      "typeVersion": 1,
+      "position": [
+        540,
+        300
+      ],
+      "parameters": {
+        "resource": "webUnlocker",
+        "operation": "WebSearch",
+        "zone": {
+          "__rl": true,
+          "mode": "list",
+          "value": "n8n_unlocker"
+        },
+        "country": {
+          "__rl": true,
+          "mode": "list",
+          "value": "us"
+        },
+        "query": "site:reddit.com/r/smallbusiness \"AI tools\" OR automation OR software recommendations",
+        "page": 1,
+        "requestOptions": {
+          "timeout": 90000
+        }
+      },
+      "credentials": {
+        "brightdataApi": {
+          "id": "l5yOfpHzFED5RbQf",
+          "name": "BrightData account"
+        }
+      }
+    },
+    {
+      "id": "a73a6872-e467-4a70-af6b-75ce1a1747c1",
+      "name": "Inspect Bright Data Reddit Posts Dataset",
+      "type": "@brightdata/n8n-nodes-brightdata.brightData",
+      "typeVersion": 1,
+      "position": [
+        540,
+        520
+      ],
+      "parameters": {
+        "resource": "marketplaceDataset",
+        "operation": "getDatasetMetadata",
+        "dataset_id": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gd_lvz8ah06191smkebj4"
+        },
+        "requestOptions": {
+          "timeout": 90000
+        }
+      },
+      "credentials": {
+        "brightdataApi": {
+          "id": "l5yOfpHzFED5RbQf",
+          "name": "BrightData account"
+        }
+      }
+    },
+    {
+      "id": "1742b82a-da72-462a-a354-4cdf20b84fbb",
+      "name": "Test Reddit Posts Dataset Scrape",
+      "type": "@brightdata/n8n-nodes-brightdata.brightData",
+      "typeVersion": 1,
+      "position": [
+        820,
+        520
+      ],
+      "parameters": {
+        "resource": "webScrapper",
+        "operation": "scrapeByUrl",
+        "dataset_id": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gd_lvz8ah06191smkebj4"
+        },
+        "urls": [
+          {
+            "url": "https://www.reddit.com/r/smallbusinessowner/comments/1y47s15/business_owners_what_is_your_ai_stack_looking/"
+          },
+          {
+            "url": "https://www.reddit.com/r/smallbusiness/comments/1rx0yi0/built_an_automation_for_a_local_business_and_got/"
+          }
+        ],
+        "include_errors": true,
+        "format": "json",
+        "requestOptions": {
+          "timeout": 120000
+        }
+      },
+      "credentials": {
+        "brightdataApi": {
+          "id": "l5yOfpHzFED5RbQf",
+          "name": "BrightData account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Start Bright Data Search Test": {
+      "main": [
+        [
+          {
+            "node": "Bright Data Google Search",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Inspect Bright Data Reddit Posts Dataset",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Test Reddit Posts Dataset Scrape",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  }
+}
