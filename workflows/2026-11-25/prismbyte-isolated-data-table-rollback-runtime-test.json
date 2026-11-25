@@ -1,0 +1,243 @@
+{
+  "name": "Prismbyte — Isolated Data Table Rollback Runtime Test",
+  "nodes": [
+    {
+      "id": "275db85e-1d8c-47d3-ab48-5641857f8af7",
+      "name": "Start Isolated Data Table Rollback Test",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        96
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "92828e69-c0fb-4618-a176-aa31a2adcfdd",
+      "name": "Prepare Success and Failure Test Cases",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        96
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "return [{json:{testPath:'success',article_id:'ROLLBACK-TEST-001',published_commit:'test-rollback-commit-abc123',last_error:'Synthetic deployment verification failure — isolated test only.'}},{json:{testPath:'failure',article_id:'ROLLBACK-TEST-001'}}];"
+      }
+    },
+    {
+      "id": "b050c316-abe4-41b6-a49b-90beffe2370e",
+      "name": "Route Success and Failure Tests",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        448,
+        96
+      ],
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.testPath }}",
+              "rightValue": "success",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "b3d84226-b14c-4a5e-8a34-bf4914a8f445",
+      "name": "Update Isolated Rollback Status — Success Path",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        672,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "ZH4y9mbyd0YcTokM"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "article_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.article_id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "publish_status": "deploy_failed_draft_restored",
+            "published_commit": "={{ $json.published_commit }}",
+            "published_url": "",
+            "last_error": "={{ $json.last_error }}"
+          },
+          "schema": [
+            {
+              "id": "publish_status",
+              "displayName": "publish_status",
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "published_commit",
+              "displayName": "published_commit",
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "published_url",
+              "displayName": "published_url",
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "last_error",
+              "displayName": "last_error",
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "89e2452e-b0d2-4336-8808-82c8e4f93c15",
+      "name": "Intentionally Fail Data Table Update",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        672,
+        192
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "ZH4y9mbyd0YcTokM"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "column_that_does_not_exist",
+              "condition": "eq",
+              "keyValue": "ROLLBACK-TEST-001"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "not_a_real_column": "rollback_failed"
+          },
+          "schema": [
+            {
+              "id": "not_a_real_column",
+              "displayName": "not_a_real_column",
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "cbc0967d-eefc-4c64-ba20-0d57a5657706",
+      "name": "Capture Data Table Error Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        192
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "return $input.all().map(i=>({json:{errorCaptured:true,errorMessage:i.json.error?.message||i.json.message||JSON.stringify(i.json)}}));"
+      }
+    }
+  ],
+  "connections": {
+    "Start Isolated Data Table Rollback Test": {
+      "main": [
+        [
+          {
+            "node": "Prepare Success and Failure Test Cases",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Success and Failure Test Cases": {
+      "main": [
+        [
+          {
+            "node": "Route Success and Failure Tests",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Success and Failure Tests": {
+      "main": [
+        [
+          {
+            "node": "Update Isolated Rollback Status — Success Path",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Intentionally Fail Data Table Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Intentionally Fail Data Table Update": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Capture Data Table Error Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  }
+}
