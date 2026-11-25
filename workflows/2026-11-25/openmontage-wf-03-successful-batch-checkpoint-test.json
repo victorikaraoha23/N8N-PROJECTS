@@ -1,0 +1,95 @@
+{
+  "name": "OpenMontage WF-03 Successful Batch Checkpoint Test",
+  "nodes": [
+    {
+      "id": "7514c77c-0a56-4d67-9a33-b92dc52e85b8",
+      "name": "Start",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "607e4984-aaf4-4f09-9876-31cd85b6682a",
+      "name": "Build Simulated Completed Batch Checkpoint",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "return [{json:{researchRunId:'00000000-0000-4000-8000-000000000005',productId:'a1c196da-65de-451b-89fd-90f5d9b9623e',batchId:'batch-test-complete-0001',ownerToken:'5a4b3c2d-1e0f-4a9b-8c7d-6e5f4a3b2c1d',generation:1,providerPath:'nvidia',recoveryAttempts:0,primaryAttempts:1,attemptHistory:[{provider:'openrouter',status:'failed',error_message:'SIMULATED primary output invalid'},{provider:'nvidia',status:'succeeded'}],claims:[{candidate_id:'candidate-test-complete-0001',claim_text:'Synthetic test claim',claim_type:'features'}],classifiedIds:['candidate-test-complete-0001'],expectedCandidateIds:['candidate-test-complete-0001']}}];"
+      }
+    },
+    {
+      "id": "66856749-e774-49f0-84f3-c2a559776647",
+      "name": "Persist Completed Batch via Supabase RPC",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        448,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://xbjezqspoghnadlcunnj.supabase.co/rest/v1/rpc/fenced_update_research_batch",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ { p_research_run_id: $json.researchRunId, p_owner_token: $json.ownerToken, p_generation: $json.generation, p_batch_id: $json.batchId, p_patch: { status: 'completed', provider_used: $json.providerPath, result: $json, recovery_attempts: Number($json.recoveryAttempts || 0) + ($json.providerPath === 'nvidia' ? 1 : 0), completed_at: $now.toISO(), error_message: '', attempt_history: $json.attemptHistory || [] } } }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": false,
+              "responseFormat": "json",
+              "neverError": false
+            }
+          },
+          "timeout": 15000
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "bsSgx3vUdbjiBca6",
+          "name": "Header Auth account 3"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Build Simulated Completed Batch Checkpoint",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Simulated Completed Batch Checkpoint": {
+      "main": [
+        [
+          {
+            "node": "Persist Completed Batch via Supabase RPC",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  }
+}
