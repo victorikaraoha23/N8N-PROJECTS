@@ -1,0 +1,1532 @@
+{
+  "name": "OpenMontage - WF-01 Product Intake",
+  "nodes": [
+    {
+      "id": "1741d39d-3c51-48c0-8d17-229e001c4bb1",
+      "name": "Telegram Product Intake",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.5,
+      "position": [
+        240,
+        360
+      ],
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {
+          "userIds": "7392605484"
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "2e09KymQc2OJWULU",
+          "name": "Telegram account"
+        }
+      },
+      "webhookId": "f4ee679f-b7a2-4426-a7a6-70cdc5960ac4"
+    },
+    {
+      "id": "fb406050-ecf4-4b47-8a04-dcb76e0c2492",
+      "name": "Authorize and Validate URL",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        520,
+        360
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const update=$input.first()?.json??{};\nconst message=update.message??update;\nconst senderId=String(message.from?.id??'');\nconst chatId=String(message.chat?.id??'');\nconst text=String(message.text??'').trim();\nconst isResearch=/^\\/research(?:@\\w+)?(?:\\s|$)/i.test(text);\nconst researchCommand=/^\\/research(?:@\\w+)?$/i.test(text);\nconst html=value=>String(value??'').replace(/[&<>\"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":'&#39;'}[ch]));\nif(senderId!=='7392605484'||message.chat?.type!=='private')return[];\nif(/^\\/cancel(?:@\\w+)?(?:\\s|$)/i.test(text))return[{json:{action:'cancel',chatId,senderId}}];\nif(/^\\/add(?:@\\w+)?(?:\\s|$)/i.test(text))return[{json:{action:'prompt',chatId,senderId}}];\nconst candidateText=isResearch?text.replace(/^\\/research(?:@\\w+)?/i,'').trim():text;\nconst matches=candidateText.match(/https?:\\/\\/[^\\s<>]+/gi)??[];\nlet rawUrl='';\nif(matches.length===1&&candidateText.replace(matches[0],'').trim()===''){\n  rawUrl=matches[0].replace(/[),.!?]+$/,'');\n}else if(matches.length===0&&candidateText){\n  const bareCandidate=candidateText.replace(/[),.!?]+$/,'');\n  const bareDomainPattern=/^(?:www\\.)?(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\\.)+[a-z]{2,}(?::\\d+)?(?:[/?#][^\\s<>]*)?$/i;\n  if(bareDomainPattern.test(bareCandidate))rawUrl='https://'+bareCandidate;\n}\nif(!rawUrl){\n  if(researchCommand&&candidateText==='')return[{json:{action:'research',status:'prompt',chatId,senderId}}];\n  return[{json:{action:isResearch?'research':'invalid',status:'invalid',chatId,senderId,reason:isResearch?'Send one complete public product URL or domain, for example:\\nhttps://example.com/':'I couldn’t find one complete product URL.\\n\\nSend /add to start, then send a single website address such as:\\nhttps://example.com'}}];\n}\nconst match=rawUrl.match(/^(https?):\\/\\/([^/?#]+)([\\s\\S]*)$/i);\nif(!match)return[{json:{action:isResearch?'research':'invalid',status:'invalid',chatId,senderId,reason:'That address doesn’t look like a valid website URL. Please use https:// or http://.'}}];\nconst protocol=match[1].toLowerCase(),authority=match[2],remainder=match[3]??'';\nif(authority.includes('@')||authority.startsWith('['))return[{json:{action:isResearch?'research':'invalid',status:'invalid',chatId,senderId,reason:'Please use a public website domain, not a private or IP address.'}}];\nconst host=authority.split(':')[0].toLowerCase(),isIp=/^\\d{1,3}(\\.\\d{1,3}){3}$/.test(host),labels=host.split('.'),validDomain=labels.length>=2&&labels.every(label=>label.length>=1&&label.length<=63&&/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(label)),blockedHost=host==='localhost'||host.endsWith('.localhost')||host.endsWith('.local'),portMatch=authority.match(/:(\\d+)$/),validPort=!portMatch||(Number(portMatch[1])>=1&&Number(portMatch[1])<=65535);\nif(isIp||!validDomain||blockedHost||!validPort||!/^[a-z0-9.-]+(?::\\d+)?$/i.test(authority))return[{json:{action:isResearch?'research':'invalid',status:'invalid',chatId,senderId,reason:'Please use a public website domain, not a private or IP address.'}}];\nconst withoutFragment=remainder.split('#')[0],normalizedRemainder=withoutFragment===''||withoutFragment.startsWith('?')?'/'+withoutFragment:withoutFragment,canonicalUrl=protocol+'://'+authority.toLowerCase()+normalizedRemainder,productName=host.replace(/^www\\./,'');\nreturn[{json:{action:isResearch?'research':'process',status:'valid',chatId,senderId,canonicalUrl,productName,safeProductName:html(productName),safeCanonicalUrl:html(canonicalUrl)}}];"
+      }
+    },
+    {
+      "id": "291bfffc-e6e7-4e21-8d88-2ad6a95ad627",
+      "name": "Is URL Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        800,
+        360
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $(\"Authorize and Validate URL\").item.json.status }}",
+              "rightValue": "valid",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "9d7bd3c4-cc7c-4ca2-a0d5-5bf15f4f2e33",
+      "name": "Find Existing Product",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1080,
+        260
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "getAll",
+        "authentication": "secretKey",
+        "tableId": "products",
+        "returnAll": false,
+        "limit": 1,
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "canonical_url",
+              "condition": "eq",
+              "keyValue": "={{ $(\"Authorize and Validate URL\").item.json.canonicalUrl }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "VIp2iiJEEE7xS20g",
+          "name": "Supabase account 2"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "b29bc7b6-8190-4a7a-b521-2fc5616b0afa",
+      "name": "Product Already Exists?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1360,
+        260
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.id }}",
+              "operator": {
+                "type": "string",
+                "operation": "exists"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "a471154f-d532-40eb-bce0-caeee135a3fb",
+      "name": "Reply Duplicate",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1640,
+        160
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $(\"Authorize and Validate URL\").item.json.chatId }}",
+        "text": "=ℹ️ <b>PRODUCT ALREADY IN YOUR LIBRARY</b>\n\n<b>{{ $(\"Authorize and Validate URL\").item.json.safeProductName }}</b>\n<a href=\"{{ $(\"Authorize and Validate URL\").item.json.safeCanonicalUrl }}\">Open product website ↗</a>\n\nNo duplicate record was created. Your existing product entry has been kept.",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML",
+          "disable_web_page_preview": true
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "2e09KymQc2OJWULU",
+          "name": "Telegram account"
+        }
+      },
+      "webhookId": "fd47cc00-8f28-4b11-94ac-07ee3485afa6"
+    },
+    {
+      "id": "aa2e047d-db56-4649-b90c-5fcc7c30b8c8",
+      "name": "Save New Product",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1640,
+        360
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "create",
+        "authentication": "secretKey",
+        "tableId": "products",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "name",
+              "fieldValue": "={{ $(\"Authorize and Validate URL\").item.json.productName }}"
+            },
+            {
+              "fieldId": "canonical_url",
+              "fieldValue": "={{ $(\"Authorize and Validate URL\").item.json.canonicalUrl }}"
+            },
+            {
+              "fieldId": "submitted_by_telegram_user_id",
+              "fieldValue": "={{ $(\"Authorize and Validate URL\").item.json.senderId }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "VIp2iiJEEE7xS20g",
+          "name": "Supabase account 2"
+        }
+      }
+    },
+    {
+      "id": "cdafebd7-33d0-4bcf-81b7-f7bf184dc511",
+      "name": "Confirm Product Saved",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1920,
+        360
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $(\"Authorize and Validate URL\").item.json.chatId }}",
+        "text": "=✅ <b>PRODUCT ADDED TO YOUR LIBRARY</b>\n\n<b>{{ $(\"Authorize and Validate URL\").item.json.safeProductName }}</b>\n<a href=\"{{ $(\"Authorize and Validate URL\").item.json.safeCanonicalUrl }}\">Open product website ↗</a>\n\n<b>Registration</b>  🟢 Saved\n<b>Research</b>  ⚪ Not started\n<b>Video production</b>  ⚪ Not started\n\n<i>Your product is safely registered. Research and video production will only begin when you request them.</i>",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML",
+          "disable_web_page_preview": true
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "2e09KymQc2OJWULU",
+          "name": "Telegram account"
+        }
+      },
+      "webhookId": "b64addce-4de2-4442-8f0c-01c5f8a58501"
+    },
+    {
+      "id": "c10895a2-f688-429b-8666-9f0720f9f11b",
+      "name": "Reply with URL Guidance",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1080,
+        560
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $(\"Authorize and Validate URL\").item.json.chatId }}",
+        "text": "=⚠️ <b>PRODUCT URL NOT ACCEPTED</b>\n\n{{ $(\"Authorize and Validate URL\").item.json.reason }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML",
+          "disable_web_page_preview": true
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "2e09KymQc2OJWULU",
+          "name": "Telegram account"
+        }
+      },
+      "webhookId": "837d8cc3-07d8-48f6-b264-522369609086"
+    },
+    {
+      "id": "1051c949-e453-41c6-954b-dc0ad53eaf1e",
+      "name": "Is /add Command?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        800,
+        360
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.action }}",
+              "rightValue": "prompt",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "17ae13a4-0516-4480-92d8-5c79a24ead35",
+      "name": "Ask for Product URL",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1080,
+        80
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $(\"Authorize and Validate URL\").item.json.chatId }}",
+        "text": "= <b>ADD A PRODUCT</b>\n\nSend me the website URL you want to add to your OpenMontage library.\n\n<i>Example:</i> https://example.com\n\nUse /cancel if you change your mind.",
+        "replyMarkup": "forceReply",
+        "forceReply": {
+          "force_reply": true,
+          "selective": true
+        },
+        "additionalFields": {
+          "appendAttribution": false,
+          "disable_web_page_preview": true,
+          "parse_mode": "HTML"
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "2e09KymQc2OJWULU",
+          "name": "Telegram account"
+        }
+      },
+      "webhookId": "56229d1e-b4bc-4991-b61d-43e6a028a738"
+    },
+    {
+      "id": "d671c95a-adee-484c-9c36-9040b199e1dd",
+      "name": "Reset Existing Intake Session",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1080,
+        80
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "delete",
+        "authentication": "secretKey",
+        "tableId": "telegram_intake_sessions",
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "telegram_chat_id",
+              "condition": "eq",
+              "keyValue": "={{ $(\"Authorize and Validate URL\").item.json.chatId }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "VIp2iiJEEE7xS20g",
+          "name": "Supabase account 2"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "2ef88e93-3757-4b88-ad9c-730be9003a13",
+      "name": "Create Intake Session",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1360,
+        80
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "create",
+        "authentication": "secretKey",
+        "tableId": "telegram_intake_sessions",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "telegram_chat_id",
+              "fieldValue": "={{ $(\"Authorize and Validate URL\").item.json.chatId }}"
+            },
+            {
+              "fieldId": "telegram_user_id",
+              "fieldValue": "={{ $(\"Authorize and Validate URL\").item.json.senderId }}"
+            },
+            {
+              "fieldId": "expires_at",
+              "fieldValue": "={{ $now.plus({ minutes: 10 }).toISO() }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "VIp2iiJEEE7xS20g",
+          "name": "Supabase account 2"
+        }
+      }
+    },
+    {
+      "id": "f1aa2df5-dd4d-47b2-981d-62675170e581",
+      "name": "Is /cancel Command?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1080,
+        360
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.action }}",
+              "rightValue": "cancel",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "1b4dfc7f-7804-4153-8532-07fe39df5f7e",
+      "name": "Delete Cancelled Session",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1080,
+        560
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "delete",
+        "authentication": "secretKey",
+        "tableId": "telegram_intake_sessions",
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "telegram_chat_id",
+              "condition": "eq",
+              "keyValue": "={{ $(\"Authorize and Validate URL\").item.json.chatId }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "VIp2iiJEEE7xS20g",
+          "name": "Supabase account 2"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "859a3147-ddc1-46e7-a485-c76fc1d68b58",
+      "name": "Reply Cancelled",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1360,
+        560
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $(\"Authorize and Validate URL\").item.json.chatId }}",
+        "text": "=✅ <b>INTAKE CANCELLED</b>\n\nNo product was added. Send /add whenever you want to start again.",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML",
+          "disable_web_page_preview": true
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "2e09KymQc2OJWULU",
+          "name": "Telegram account"
+        }
+      },
+      "webhookId": "b8446864-e0af-4c0f-93cc-abb9b3fa2d22"
+    },
+    {
+      "id": "4c90d3a8-0310-46a0-9df6-46219820d6fa",
+      "name": "Lookup Intake Session",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1360,
+        360
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "getAll",
+        "authentication": "secretKey",
+        "tableId": "telegram_intake_sessions",
+        "returnAll": false,
+        "limit": 1,
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "telegram_chat_id",
+              "condition": "eq",
+              "keyValue": "={{ $(\"Authorize and Validate URL\").item.json.chatId }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "VIp2iiJEEE7xS20g",
+          "name": "Supabase account 2"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "17172353-7eb8-4a83-bcff-99184ba062f6",
+      "name": "Is Intake Session Active?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1640,
+        360
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.telegram_user_id === $(\"Authorize and Validate URL\").item.json.senderId && Date.parse($json.expires_at) > Date.now() ? \"active\" : \"inactive\" }}",
+              "rightValue": "active",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "35a9e808-07c7-4029-b693-7e520f4a8c83",
+      "name": "Reply Start With Add",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1360,
+        1920
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $(\"Authorize and Validate URL\").item.json.chatId }}",
+        "text": "=⚠️ <b>NO ACTIVE PRODUCT INTAKE</b>\n\nSend /add first. I’ll then ask you for the product website URL.\n\nIf you already started, the 10-minute intake session may have expired.",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML",
+          "disable_web_page_preview": true
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "2e09KymQc2OJWULU",
+          "name": "Telegram account"
+        }
+      },
+      "webhookId": "493d0702-2dea-4f93-ad0c-d5be58f6922b"
+    },
+    {
+      "id": "b4cb8733-6676-434e-a964-6f5301ef6325",
+      "name": "Clear Session After Duplicate",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1080,
+        80
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "delete",
+        "authentication": "secretKey",
+        "tableId": "telegram_intake_sessions",
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "telegram_chat_id",
+              "condition": "eq",
+              "keyValue": "={{ $(\"Authorize and Validate URL\").item.json.chatId }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "VIp2iiJEEE7xS20g",
+          "name": "Supabase account 2"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "7ee7b588-8e7b-4b8f-aa83-50dde7bcadaa",
+      "name": "Clear Session After Save",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1080,
+        360
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "delete",
+        "authentication": "secretKey",
+        "tableId": "telegram_intake_sessions",
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "telegram_chat_id",
+              "condition": "eq",
+              "keyValue": "={{ $(\"Authorize and Validate URL\").item.json.chatId }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "VIp2iiJEEE7xS20g",
+          "name": "Supabase account 2"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "b0e9c080-6c71-48be-ae16-46a43c2facd2",
+      "name": "Is Research Request?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1360,
+        760
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.action }}",
+              "rightValue": "research",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "54d1e201-50e0-48de-acff-cdb5e3f5e51f",
+      "name": "Is Research URL Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1640,
+        760
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $('Authorize and Validate URL').item.json.status }}",
+              "rightValue": "valid",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "cc3aae57-59c4-42e4-a1d9-38cb0b4d4151",
+      "name": "Run WF-02 Product Lookup",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1920,
+        680
+      ],
+      "parameters": {
+        "mode": "once",
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "Tuxbd2tkGxmUKg5l"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "canonicalUrl": "={{ $('Authorize and Validate URL').item.json.canonicalUrl }}",
+            "chatId": "={{ $('Authorize and Validate URL').item.json.chatId }}",
+            "senderId": "={{ $('Authorize and Validate URL').item.json.senderId }}",
+            "requestId": "={{ $('Attach Telegram Request ID').item.json.requestId }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "canonicalUrl",
+              "displayName": "canonicalUrl",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "chatId",
+              "displayName": "chatId",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "senderId",
+              "displayName": "senderId",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "requestId",
+              "displayName": "requestId",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      }
+    },
+    {
+      "id": "fdefc4f5-3596-43cb-92ab-dbfaf208a1ca",
+      "name": "Research Product Found?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2200,
+        680
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $('Run WF-02 Product Lookup').first().json.status }}",
+              "rightValue": "found",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "75bb2b2e-d19a-44af-a705-9590c1bd0193",
+      "name": "Reply Research Accepted",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2480,
+        580
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $('Run WF-02 Product Lookup').first().json.chatId }}",
+        "text": "=🔎 <b>RESEARCH REQUEST</b>\n\n<b>{{ $('Run WF-02 Product Lookup').first().json.productName }}</b>\n<a href=\"{{ $('Run WF-02 Product Lookup').first().json.canonicalUrl }}\">Open product website ↗</a>\n\n<b>Research run:</b> <code>{{ $('Run WF-02 Product Lookup').first().json.researchRunId }}</code>\n<b>Homepage:</b> {{ $('Run WF-02 Product Lookup').first().json.homepageCollected ? '🟢 Collected' : ($('Run WF-02 Product Lookup').first().json.researchRunStatus === 'failed' ? '🔴 Failed' : '🟡 Pending') }}\n<b>Internal pages:</b> {{ $('Run WF-02 Product Lookup').first().json.internalPagesCollected || 0 }} collected / {{ $('Run WF-02 Product Lookup').first().json.internalPagesAttempted || 0 }} attempted\n{{ ($('Run WF-02 Product Lookup').first().json.internalPagesFailed || 0) > 0 ? '⚠️ ' + $('Run WF-02 Product Lookup').first().json.internalPagesFailed + ' page fetch/save failures. ' : '' }}{{ ($('Run WF-02 Product Lookup').first().json.internalPagesSkipped || 0) > 0 ? $('Run WF-02 Product Lookup').first().json.internalPagesSkipped + ' page(s) skipped (redirect, non-HTML or empty content).' : '' }}\n<b>Claim extraction:</b> {{ $('Run WF-02 Product Lookup').first().json.claimExtractionStatus === 'completed' ? '🟢 Completed' : ($('Run WF-02 Product Lookup').first().json.claimExtractionStatus === 'failed' ? '🔴 Failed' : '🟡 Pending') }}\n{{ $('Run WF-02 Product Lookup').first().json.claimExtractionSummary || 'No extraction summary is available.' }}\n\n<b>Evidence verification:</b> {{ $('Run WF-02 Product Lookup').first().json.verificationStatus === 'completed' ? '🟢 Completed' : ($('Run WF-02 Product Lookup').first().json.verificationStatus === 'not_required' ? '⚪ Not required' : '🟡 Pending') }}\n{{ $('Run WF-02 Product Lookup').first().json.verificationSummary || 'No verification summary is available.' }}\n\n<i>First-party website statements are not treated as independent proof of product capabilities. No video production has been started.</i>",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML",
+          "disable_web_page_preview": true
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "2e09KymQc2OJWULU",
+          "name": "Telegram account"
+        }
+      },
+      "webhookId": "cee4bd61-d526-4e02-a0c5-93a8f075a1f2"
+    },
+    {
+      "id": "1d336496-cec0-4ee5-86fe-272122f2bceb",
+      "name": "Reply Product Not Registered",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2480,
+        780
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $('Run WF-02 Product Lookup').first().json.chatId }}",
+        "text": "=⚠️ <b>PRODUCT NOT FOUND IN YOUR LIBRARY</b>\n\n{{ $('Run WF-02 Product Lookup').first().json.canonicalUrl }}\n\nAdd the product first with /add. Research can only be requested for products already registered in OpenMontage.",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML",
+          "disable_web_page_preview": true
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "2e09KymQc2OJWULU",
+          "name": "Telegram account"
+        }
+      },
+      "webhookId": "992889e4-023a-4534-a751-24f9cec0f5b3"
+    },
+    {
+      "id": "09e0404f-fa16-407a-91fb-f2ee8dc607b3",
+      "name": "Reply Research URL Guidance",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1920,
+        900
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $('Authorize and Validate URL').item.json.chatId }}",
+        "text": "=⚠️ <b>RESEARCH REQUEST NOT ACCEPTED</b>\n\nUse this format with a product already saved in your library:\n\n<code>/research https://example.com/</code>\n\nPlease send one complete public website URL.",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML",
+          "disable_web_page_preview": true
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "2e09KymQc2OJWULU",
+          "name": "Telegram account"
+        }
+      },
+      "webhookId": "02e55ed2-a4b8-4cb2-8ffa-c22def5e95bf"
+    },
+    {
+      "id": "072d3a2d-92d1-4fcc-956e-9fa86619324d",
+      "name": "Is Research Command Only?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1920,
+        1040
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $('Authorize and Validate URL').item.json.status }}",
+              "rightValue": "prompt",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "14bf51f5-0348-4f7f-842c-cef6387e30af",
+      "name": "Is Research Session?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1920,
+        1240
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.intent }}",
+              "rightValue": "research",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "d076cf02-94ad-4a76-be6e-428ec5f1b752",
+      "name": "Reset Existing Research Session",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2200,
+        1120
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "delete",
+        "authentication": "secretKey",
+        "tableId": "telegram_intake_sessions",
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "telegram_chat_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Authorize and Validate URL').item.json.chatId }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "VIp2iiJEEE7xS20g",
+          "name": "Supabase account 2"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "080a7dc1-17d3-4583-98d9-2453c68841b1",
+      "name": "Create Research Session",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2480,
+        1120
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "create",
+        "authentication": "secretKey",
+        "tableId": "telegram_intake_sessions",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "telegram_chat_id",
+              "fieldValue": "={{ $('Authorize and Validate URL').item.json.chatId }}"
+            },
+            {
+              "fieldId": "telegram_user_id",
+              "fieldValue": "={{ $('Authorize and Validate URL').item.json.senderId }}"
+            },
+            {
+              "fieldId": "expires_at",
+              "fieldValue": "={{ $now.plus({ minutes: 10 }).toISO() }}"
+            },
+            {
+              "fieldId": "intent",
+              "fieldValue": "research"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "VIp2iiJEEE7xS20g",
+          "name": "Supabase account 2"
+        }
+      }
+    },
+    {
+      "id": "783af705-6864-4b68-8ed7-536bdab62f92",
+      "name": "Ask for Research Product URL",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2760,
+        1120
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $('Authorize and Validate URL').item.json.chatId }}",
+        "text": "=🔎 <b>RESEARCH A PRODUCT</b>\n\nSend me the website URL of a product already registered in your OpenMontage library.\n\n<i>Example:</i> https://example.com\n\nUse /cancel if you change your mind.",
+        "replyMarkup": "forceReply",
+        "forceReply": {
+          "force_reply": true,
+          "selective": true
+        },
+        "additionalFields": {
+          "appendAttribution": false,
+          "disable_web_page_preview": true,
+          "parse_mode": "HTML"
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "2e09KymQc2OJWULU",
+          "name": "Telegram account"
+        }
+      },
+      "webhookId": "ed51c580-2faa-41e3-a8ea-33fab2839456"
+    },
+    {
+      "id": "0c6e4835-2895-4c60-a17c-25db4e9693d9",
+      "name": "Attach Telegram Request ID",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        660,
+        520
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": true,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "telegram-request-id",
+              "name": "requestId",
+              "value": "={{ String($('Telegram Product Intake').first().json.message.message_id) }}",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "c6198a68-a1a3-47ca-9a5a-4eab48130b45",
+      "name": "Clear Research Session After Lookup",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2200,
+        900
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "delete",
+        "authentication": "secretKey",
+        "tableId": "telegram_intake_sessions",
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "telegram_chat_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Authorize and Validate URL').item.json.chatId }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "VIp2iiJEEE7xS20g",
+          "name": "Supabase account 2"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "7a5b0a54-43f8-4c9d-9a25-8f3d0a6e4b21",
+      "name": "Send Product Lookup Started",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1640,
+        680
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $('Authorize and Validate URL').first().json.chatId }}",
+        "text": "=🔎 <b>REQUEST RECEIVED</b>\\n\\nI’m checking your product library and preparing the research request. I’ll send another message when the result is ready.",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML",
+          "disable_web_page_preview": true
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "2e09KymQc2OJWULU",
+          "name": "Telegram account"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "webhookId": "90256e66-87af-4f6a-a949-036f51a6fa1e"
+    }
+  ],
+  "connections": {
+    "Telegram Product Intake": {
+      "main": [
+        [
+          {
+            "node": "Authorize and Validate URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is URL Valid?": {
+      "main": [
+        [
+          {
+            "node": "Find Existing Product",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reply with URL Guidance",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Existing Product": {
+      "main": [
+        [
+          {
+            "node": "Product Already Exists?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is /add Command?": {
+      "main": [
+        [
+          {
+            "node": "Reset Existing Intake Session",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Is /cancel Command?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reset Existing Intake Session": {
+      "main": [
+        [
+          {
+            "node": "Create Intake Session",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Intake Session": {
+      "main": [
+        [
+          {
+            "node": "Ask for Product URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is /cancel Command?": {
+      "main": [
+        [
+          {
+            "node": "Delete Cancelled Session",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Is Research Request?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete Cancelled Session": {
+      "main": [
+        [
+          {
+            "node": "Reply Cancelled",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lookup Intake Session": {
+      "main": [
+        [
+          {
+            "node": "Is Intake Session Active?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Intake Session Active?": {
+      "main": [
+        [
+          {
+            "node": "Is Research Session?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reply Start With Add",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Product Already Exists?": {
+      "main": [
+        [
+          {
+            "node": "Clear Session After Duplicate",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Save New Product",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clear Session After Duplicate": {
+      "main": [
+        [
+          {
+            "node": "Reply Duplicate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save New Product": {
+      "main": [
+        [
+          {
+            "node": "Clear Session After Save",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clear Session After Save": {
+      "main": [
+        [
+          {
+            "node": "Confirm Product Saved",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Research Request?": {
+      "main": [
+        [
+          {
+            "node": "Is Research URL Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Lookup Intake Session",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Research URL Valid?": {
+      "main": [
+        [
+          {
+            "node": "Send Product Lookup Started",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Is Research Command Only?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run WF-02 Product Lookup": {
+      "main": [
+        [
+          {
+            "node": "Clear Research Session After Lookup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Research Product Found?": {
+      "main": [
+        [
+          {
+            "node": "Reply Research Accepted",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reply Product Not Registered",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Research Command Only?": {
+      "main": [
+        [
+          {
+            "node": "Reset Existing Research Session",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reply Research URL Guidance",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reset Existing Research Session": {
+      "main": [
+        [
+          {
+            "node": "Create Research Session",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Research Session": {
+      "main": [
+        [
+          {
+            "node": "Ask for Research Product URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Research Session?": {
+      "main": [
+        [
+          {
+            "node": "Is Research URL Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Is URL Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Authorize and Validate URL": {
+      "main": [
+        [
+          {
+            "node": "Attach Telegram Request ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Attach Telegram Request ID": {
+      "main": [
+        [
+          {
+            "node": "Is /add Command?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clear Research Session After Lookup": {
+      "main": [
+        [
+          {
+            "node": "Research Product Found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Product Lookup Started": {
+      "main": [
+        [
+          {
+            "node": "Run WF-02 Product Lookup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner",
+    "saveExecutionProgress": true,
+    "saveDataErrorExecution": "all"
+  }
+}
