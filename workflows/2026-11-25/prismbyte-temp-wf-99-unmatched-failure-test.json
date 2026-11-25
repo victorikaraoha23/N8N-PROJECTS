@@ -1,0 +1,54 @@
+{
+  "name": "Prismbyte — TEMP WF-99 Unmatched Failure Test",
+  "nodes": [
+    {
+      "id": "0fe26cb0-007f-45e1-b978-6253ac4faf01",
+      "name": "Isolated Unmatched Failure Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "prismbyte-wf99-unmatched-test",
+        "responseMode": "onReceived"
+      },
+      "webhookId": "6de26bcc-642e-4ab5-b33d-07e414aa681d"
+    },
+    {
+      "id": "30793584-e87e-47a8-9760-c92d8cb7e87a",
+      "name": "Deliberate Unmatched Failure",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "throw new Error('WF-99 unmatched-request fallback test');"
+      }
+    }
+  ],
+  "connections": {
+    "Isolated Unmatched Failure Webhook": {
+      "main": [
+        [
+          {
+            "node": "Deliberate Unmatched Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "errorWorkflow": "H4RRkVb2YuCVgaKu"
+  }
+}
