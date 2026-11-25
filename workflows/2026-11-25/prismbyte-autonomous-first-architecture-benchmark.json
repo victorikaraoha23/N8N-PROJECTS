@@ -1,0 +1,1540 @@
+{
+  "name": "Prismbyte — Autonomous-First Architecture Benchmark",
+  "nodes": [
+    {
+      "id": "df27d7ce-267e-4b2f-8d31-980e9a02480f",
+      "name": "Manual Benchmark Start",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "c272768b-6cec-469b-87f8-d9dd55bd4aed",
+      "name": "Agent 1 — Autonomous Idea Discovery",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        520,
+        300
+      ],
+      "parameters": {
+        "promptType": "define",
+        "text": "=Run a fresh Prismbyte idea-discovery cycle as of {{ $now.toISO() }}. Search Reddit using Bright Data Google Search with site:reddit.com and focused terms. Fetch up to two relevant posts using Bright Data Page Fetch. Search the wider web once for topic context. Return ONLY valid JSON with keys: topic, proposed_title, search_intent, target_reader, article_type, article_angle, why_now, reddit_evidence (array of url/title/subreddit/insight/score/comment_count), community_evidence_available, discovery_sources (array of url/title/reason), duplicate_risk, commercial_relevance, evidence_availability, score (0-100), recommendation (PROCEED or REJECT), rejection_reason. No unsupported search-volume claims.",
+        "options": {
+          "systemMessage": "You are Prismbyte autonomous content opportunity scout. Use Bright Data Google Search and Bright Data Page Fetch. Search Reddit with focused site:reddit.com queries, fetch no more than two relevant Reddit posts, and search the broader web once for topic context or competition. If Google results contain no direct Reddit post URLs, record community_evidence_available=false and continue with reliable web evidence; never invent Reddit discussions. Choose one evergreen, useful topic. Reject duplicates, weak demand, thin evidence and topics outside Prismbyte. Do not invent search volume or trends. Return one valid JSON object only. Do not write or publish.",
+          "maxIterations": 6,
+          "returnIntermediateSteps": false,
+          "forceToolCallOnFirstIteration": true
+        },
+        "needsFallback": false
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "8105a716-94fd-49cf-b956-996bf7f5b72a",
+      "name": "OpenRouter Free — Idea Discovery",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        520,
+        720
+      ],
+      "parameters": {
+        "model": "openrouter/free",
+        "options": {
+          "temperature": 0.2,
+          "maxTokens": 12000,
+          "timeout": 600000,
+          "maxRetries": 2,
+          "providerRouting": {
+            "allowFallbacks": true
+          }
+        }
+      },
+      "credentials": {
+        "openRouterApi": {
+          "id": "tXV34j8GdgjTO9xz",
+          "name": "OpenRouter account"
+        }
+      }
+    },
+    {
+      "id": "57a4e43c-9219-48c8-999c-9b600ca8d3de",
+      "name": "Bright Data Reddit and Web Search",
+      "type": "@brightdata/n8n-nodes-brightdata.brightDataTool",
+      "typeVersion": 1,
+      "position": [
+        540,
+        1080
+      ],
+      "parameters": {
+        "resource": "webUnlocker",
+        "operation": "WebSearch",
+        "descriptionType": "manual",
+        "toolDescription": "Search Google. For Reddit discovery use site:reddit.com plus topic and subreddit terms. Return actual URLs and snippets only; snippets are leads, not verified facts.",
+        "zone": {
+          "__rl": true,
+          "mode": "list",
+          "value": "n8n_unlocker"
+        },
+        "country": {
+          "__rl": true,
+          "mode": "list",
+          "value": "us"
+        },
+        "query": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('query', 'Focused Google search query. Use site:reddit.com for Reddit discovery.') }}",
+        "page": 1,
+        "requestOptions": {
+          "timeout": 90000
+        }
+      },
+      "credentials": {
+        "brightdataApi": {
+          "id": "l5yOfpHzFED5RbQf",
+          "name": "BrightData account"
+        }
+      }
+    },
+    {
+      "id": "1b9fa963-40e5-4c20-9b3d-e41832b27574",
+      "name": "Bright Data Reddit Discussion Fetch",
+      "type": "@brightdata/n8n-nodes-brightdata.brightDataTool",
+      "typeVersion": 1,
+      "position": [
+        720,
+        1260
+      ],
+      "parameters": {
+        "resource": "webUnlocker",
+        "operation": "request",
+        "descriptionType": "manual",
+        "toolDescription": "Fetch the exact public Reddit discussion or web page URL obtained from search. Return page content in Markdown and final URL. Do not invent content.",
+        "zone": {
+          "__rl": true,
+          "mode": "list",
+          "value": "n8n_unlocker"
+        },
+        "country": {
+          "__rl": true,
+          "mode": "list",
+          "value": "us"
+        },
+        "method": "GET",
+        "url": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('url', 'Exact HTTP or HTTPS URL to fetch.') }}",
+        "data_format": "markdown",
+        "requestOptions": {
+          "timeout": 90000
+        }
+      },
+      "credentials": {
+        "brightdataApi": {
+          "id": "l5yOfpHzFED5RbQf",
+          "name": "BrightData account"
+        }
+      }
+    },
+    {
+      "id": "90c47035-c26f-45f1-a4f7-ef298dbd74ca",
+      "name": "Validate and Normalise Idea",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        820,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const raw=String($input.first()?.json?.output||'').trim();function parse(s){let t=s.replace(/^```(?:json)?\\s*/i,'').replace(/```\\s*$/,'').trim();const a=t.indexOf('{'),b=t.lastIndexOf('}');if(a>=0&&b>a)t=t.slice(a,b+1);return JSON.parse(t)}let x;try{x=parse(raw)}catch(e){throw new Error('Idea discovery invalid JSON: '+e.message)}const score=Number(x.score);if(!x.topic||!x.proposed_title||!Array.isArray(x.discovery_sources)||!Number.isFinite(score))throw new Error('Idea candidate missing required fields');if(x.recommendation!=='PROCEED'||score<65)throw new Error('Idea rejected or below 65-point autonomous threshold');return [{json:{...x,score,idea_status:'selected_for_research',discovered_at:new Date().toISOString()}}];"
+      }
+    },
+    {
+      "id": "c7751723-229a-4fdf-801a-49f49a085b22",
+      "name": "Agent 2 — Research Specialist",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1120,
+        300
+      ],
+      "parameters": {
+        "promptType": "define",
+        "text": "=Research this Prismbyte topic using Tavily only as the primary provider. Candidate: {{ JSON.stringify($json.candidate) }}. Return ONLY a complete valid JSON object with keys: research_status (COMPLETE or INSUFFICIENT), topic, search_intent, target_reader, article_angle, key_questions, key_findings, verified_facts, product_information, comparison_data, source_register (array of {title,url,source_type,published_or_updated,accessed_at,evidence,claims_supported}), claim_evidence_map, reddit_insights, competitor_analysis, content_gaps, limitations, conflicting_evidence, unsupported_claims_to_avoid, suggested_structure, research_confidence, unresolved_questions, research_failure_reason.",
+        "options": {
+          "systemMessage": "You are Prismbyte's primary research agent. Your only research tool is Tavily. Make one focused Tavily search call and, only if needed, one extraction call. Do not use or attempt any other provider. If Tavily returns an error, quota limit, empty results or insufficient evidence, return research_status=INSUFFICIENT with the topic, an empty source_register and a concise research_failure_reason. Do not loop or repeat failed Tavily requests. If research is sufficient, return at least three distinct sources, including at least two official or primary sources for product/price/feature claims. Each source must have an exact HTTP(S) URL, title, source_type and evidence excerpt of at least 40 characters. Use strict JSON with double-quoted keys and strings, no Markdown fences and no trailing commas. Do not invent facts, URLs, dates, prices or source content. Do not write or publish.",
+          "maxIterations": 4,
+          "returnIntermediateSteps": false,
+          "forceToolCallOnFirstIteration": true
+        },
+        "needsFallback": false
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "5b157e4a-27c2-4659-b457-2e090c61a29c",
+      "name": "OpenRouter Free — Research",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        1000,
+        720
+      ],
+      "parameters": {
+        "model": "openrouter/free",
+        "options": {
+          "temperature": 0.1,
+          "maxTokens": 24000,
+          "timeout": 600000,
+          "maxRetries": 2,
+          "providerRouting": {
+            "allowFallbacks": true
+          }
+        }
+      },
+      "credentials": {
+        "openRouterApi": {
+          "id": "tXV34j8GdgjTO9xz",
+          "name": "OpenRouter account"
+        }
+      }
+    },
+    {
+      "id": "2cc34048-0e0d-4c6d-81f1-8989e27b3327",
+      "name": "Tavily Primary Research",
+      "type": "@n8n/mcp-registry.tavily",
+      "typeVersion": 1.1,
+      "position": [
+        900,
+        900
+      ],
+      "parameters": {
+        "include": "all",
+        "options": {
+          "timeout": 90000
+        }
+      },
+      "credentials": {
+        "tavilyMcpOAuth2Api": {
+          "id": "5DhcuWRc8MK2gUEN",
+          "name": "Tavily account"
+        }
+      }
+    },
+    {
+      "id": "07651175-c15c-47f0-b823-b68e1c8a5770",
+      "name": "Bright Data Official Page Fetch",
+      "type": "@brightdata/n8n-nodes-brightdata.brightDataTool",
+      "typeVersion": 1,
+      "position": [
+        1260,
+        1260
+      ],
+      "parameters": {
+        "resource": "webUnlocker",
+        "operation": "request",
+        "descriptionType": "manual",
+        "toolDescription": "Fetch the exact public Reddit discussion, official product page, pricing page or documentation URL obtained from Bright Data search. Return the page content in Markdown and final URL. Do not invent content.",
+        "zone": {
+          "__rl": true,
+          "mode": "list",
+          "value": "n8n_unlocker"
+        },
+        "country": {
+          "__rl": true,
+          "mode": "list",
+          "value": "us"
+        },
+        "method": "GET",
+        "url": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('url', 'Exact official source URL to fetch.') }}",
+        "data_format": "markdown",
+        "requestOptions": {
+          "timeout": 90000
+        }
+      },
+      "credentials": {
+        "brightdataApi": {
+          "id": "l5yOfpHzFED5RbQf",
+          "name": "BrightData account"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "id": "254c6713-941a-422b-9d56-814897eb4202",
+      "name": "Validate Research Evidence Pack",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1420,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const raw=String($input.first()?.json?.output||'').trim();\nconst candidate=$('Prepare Research Input').first().json.candidate;\nfunction parse(s){let t=s.trim();const a=t.indexOf('{'),b=t.lastIndexOf('}');if(a>=0&&b>a)t=t.slice(a,b+1);t=t.replace(/,\\s*([}\\]])/g,'$1');return JSON.parse(t)}\nlet x;try{x=parse(raw)}catch(e){return [{json:{topic:candidate.topic,candidate,research_valid:false,research_failure_reason:'Primary Tavily research returned invalid JSON: '+e.message}}]}\nconst src=Array.isArray(x.source_register)?x.source_register:[];\nconst good=src.filter(s=>/^https?:\\/\\/[^\\s]+$/i.test(String(s.url||''))&&String(s.title||'').trim()&&String(s.evidence||'').trim().length>=40);\nconst unique=[...new Map(good.map(s=>[s.url,s])).values()];\nconst official=unique.filter(s=>/official|primary|documentation|pricing|product page|github repository/i.test(String(s.source_type||'')+' '+String(s.title||'')));\nconst valid=String(x.research_status||'').toUpperCase()==='COMPLETE'&&unique.length>=3&&official.length>=2&&x.claim_evidence_map&&Array.isArray(x.key_questions)&&Array.isArray(x.suggested_structure);\nreturn [{json:{...x,topic:x.topic||candidate.topic,candidate,source_register:unique,source_count:unique.length,official_source_count:official.length,research_valid:Boolean(valid),research_failure_reason:valid?null:(x.research_failure_reason||'Primary research did not meet source-quality requirements.')}}];"
+      }
+    },
+    {
+      "id": "f236dfc5-a910-4541-aae2-3fd342e5f703",
+      "name": "Agent 3 — Prismbyte Article Writer",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1740,
+        300
+      ],
+      "parameters": {
+        "promptType": "define",
+        "text": "=Write the complete Prismbyte article using this validated research pack. Research: {{ JSON.stringify($json) }}. Return an editorial brief, claim/source register and exactly one fenced complete Astro Markdown article.",
+        "options": {
+          "systemMessage": "You are Prismbyte senior technology and software editor. Use only supplied validated research. Do not invent features, prices, benchmarks, statistics, quotes, product tests, personal experience or affiliate relationships. Cite only exact URLs in the research pack. Produce a complete, genuinely useful article without arbitrary word-count limits or generic filler. Explain trade-offs, limitations and practical use cases. Astro frontmatter allowed: title, description, publishDate, category (ai-saas|automation|troubleshooting), tags, author, featuredImage, featuredImageAlt, imageSource, draft, sources, affiliateDisclosure. Use publishDate: DATE_TO_BE_SET_BY_WORKFLOW; workflow supplies authoritative date. Always draft: true. Sources must be exact supplied URLs, maximum five. Do not add slug, seoTitle or focusKeyword. Never publish or claim QA approval.",
+          "maxIterations": 2,
+          "returnIntermediateSteps": false
+        },
+        "needsFallback": false
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "8b3d41dc-3629-4dd8-914b-23faf84bef60",
+      "name": "OpenRouter Free — Article Writer",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        1640,
+        720
+      ],
+      "parameters": {
+        "model": "openrouter/free",
+        "options": {
+          "temperature": 0.35,
+          "maxTokens": 32000,
+          "timeout": 600000,
+          "maxRetries": 2,
+          "providerRouting": {
+            "allowFallbacks": true
+          }
+        }
+      },
+      "credentials": {
+        "openRouterApi": {
+          "id": "tXV34j8GdgjTO9xz",
+          "name": "OpenRouter account"
+        }
+      }
+    },
+    {
+      "id": "994c9761-4fc7-4a0a-b823-89d2bdffd10a",
+      "name": "Prepare Independent QA Package",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2020,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "let research; for (const name of ['Validate NVIDIA Bright Data Research','Validate Bright Data Fallback Research','Validate Research Evidence Pack']) { try { const candidate=$(name).first().json; if(candidate && candidate.research_valid===true) { research=candidate; break; } } catch(e) {} } if(!research) throw new Error('Editorial QA stopped: no validated research pack is available.'); const article=String($input.first()?.json?.output||''); if(article.length<1000) throw new Error('Writer output is incomplete'); const pack={topic:research.topic,search_intent:research.search_intent,target_reader:research.target_reader,article_angle:research.article_angle,key_findings:research.key_findings,verified_facts:research.verified_facts,source_register:(research.source_register||[]).map(s=>({title:s.title,url:s.url,source_type:s.source_type,evidence:String(s.evidence||'').slice(0,700),claims_supported:s.claims_supported})),claim_evidence_map:research.claim_evidence_map,limitations:research.limitations,conflicting_evidence:research.conflicting_evidence,unsupported_claims_to_avoid:research.unsupported_claims_to_avoid,suggested_structure:research.suggested_structure}; return [{json:{topic:research.topic,research_pack:pack,article}}];"
+      }
+    },
+    {
+      "id": "e970af8b-f0f2-4bcb-9bf8-68a3570ada30",
+      "name": "Agent 4 — Independent Editorial QA",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        2320,
+        300
+      ],
+      "parameters": {
+        "promptType": "define",
+        "text": "=Independently audit this article against its original research. Package: {{ JSON.stringify($json) }}. Return ONLY JSON: {\"status\":\"PASS|FAIL\",\"article_complete\":true,\"factual_accuracy\":true,\"source_support\":true,\"editorial_quality\":true,\"unsupported_claims\":[],\"critical_issues\":[],\"required_corrections\":[],\"source_issues\":[],\"editorial_notes\":[]}",
+        "options": {
+          "systemMessage": "You are an independent Prismbyte editorial auditor. You did not write this article. Audit the COMPLETE article against the compact validated research pack. Verify material claims, product features, prices, dates, comparisons, source attribution, usefulness, missing limitations, affiliate integrity, frontmatter and Markdown. Do not repeat research. Do not assume unsupported claims are true. PASS only if every mandatory check is satisfied and no critical or unsupported factual claim remains. Otherwise FAIL with specific corrections. Return one strict JSON object only with boolean fields article_complete, factual_accuracy, source_support and editorial_quality, plus arrays unsupported_claims, critical_issues, required_corrections, source_issues and editorial_notes. No Markdown fences and no trailing commas. Never publish.",
+          "maxIterations": 2,
+          "returnIntermediateSteps": false
+        },
+        "needsFallback": false
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "f2f041ba-8f9a-404e-9e07-675d94e2ae0b",
+      "name": "OpenRouter Free — Independent QA",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        2240,
+        720
+      ],
+      "parameters": {
+        "model": "openrouter/free",
+        "options": {
+          "temperature": 0.1,
+          "maxTokens": 12000,
+          "timeout": 600000,
+          "maxRetries": 2,
+          "providerRouting": {
+            "allowFallbacks": true
+          }
+        }
+      },
+      "credentials": {
+        "openRouterApi": {
+          "id": "tXV34j8GdgjTO9xz",
+          "name": "OpenRouter account"
+        }
+      }
+    },
+    {
+      "id": "321a7dd4-7aca-4ab5-8790-50ad00579a7d",
+      "name": "Final Benchmark Result — No Publishing",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2620,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const raw=String($input.first()?.json?.output||'').trim(); function parse(s){let t=s.trim();const a=t.indexOf('{'),b=t.lastIndexOf('}');if(a>=0&&b>a)t=t.slice(a,b+1);t=t.replace(/,\\s*([}\\]])/g,'$1');return JSON.parse(t)} let q;try{q=parse(raw)}catch(e){throw new Error('QA agent invalid JSON: '+e.message)} const qaPackage=$('Prepare Independent QA Package').first().json; const article=String(qaPackage.article||''); const research=qaPackage.research_pack||{}; if(article.length<1000)throw new Error('Final result is missing the complete article from the QA package'); const pass=q.status==='PASS'&&q.article_complete===true&&q.factual_accuracy===true&&q.source_support===true&&q.editorial_quality===true&&Array.isArray(q.critical_issues)&&q.critical_issues.length===0&&Array.isArray(q.unsupported_claims)&&q.unsupported_claims.length===0; return [{json:{benchmark_status:pass?'QA_PASS_DRAFT_ONLY':'HOLD',qa:q,article,research_summary:{topic:research.topic,source_count:research.source_count,official_source_count:research.official_source_count},publication_performed:false}}];"
+      }
+    },
+    {
+      "id": "cafed43e-a3ef-4e88-9789-b47cb99987aa",
+      "name": "Daily Autonomous Discovery Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        240,
+        520
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "daysInterval": 1,
+              "triggerAtHour": 7,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "7d033463-821d-4e8c-babb-66990dabadae",
+      "name": "Manual Test Topic",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        520,
+        520
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "return [{json:{topic:'Best AI automation tools for small businesses in 2026',proposed_title:'Best AI Automation Tools for Small Businesses in 2026',search_intent:'Compare practical AI automation tools for small businesses',target_reader:'Small-business owners and operators',article_type:'comparison guide',article_angle:'Evidence-led guide to practical tools, limitations, pricing and use cases',source_type:'manual_benchmark',recommendation:'PROCEED',score:85}}];"
+      }
+    },
+    {
+      "id": "58eac154-04bb-4a2a-b9bb-0d7b8ab2b251",
+      "name": "Prepare Research Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1000,
+        500
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const candidate=$input.first().json; if(!candidate.topic) throw new Error('Research input is missing topic'); return [{json:{topic:candidate.topic,candidate}}];"
+      }
+    },
+    {
+      "id": "508c1e38-989b-482a-83d0-2989bf10566b",
+      "name": "Research Pack Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1660,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.research_valid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "34c58710-23ad-4935-996f-a1ecb6db9475",
+      "name": "Bright Data Fallback Search (Controlled)",
+      "type": "@brightdata/n8n-nodes-brightdata.brightData",
+      "typeVersion": 1,
+      "position": [
+        1900,
+        520
+      ],
+      "parameters": {
+        "resource": "webUnlocker",
+        "operation": "WebSearch",
+        "zone": {
+          "__rl": true,
+          "mode": "list",
+          "value": "n8n_unlocker"
+        },
+        "country": {
+          "__rl": true,
+          "mode": "list",
+          "value": "us"
+        },
+        "query": "={{ $json.topic + ' official documentation pricing features' }}",
+        "page": 1,
+        "requestOptions": {
+          "timeout": 90000
+        }
+      },
+      "credentials": {
+        "brightdataApi": {
+          "id": "l5yOfpHzFED5RbQf",
+          "name": "BrightData account"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2500
+    },
+    {
+      "id": "e9dfcc55-8e36-44dd-a598-aba034dc324d",
+      "name": "Prepare Bright Data Fallback Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2180,
+        520
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const failed=$input.first().json; const topic=String(failed.topic||''); const candidate=failed.candidate||{}; const verificationQuery='site:zapier.com OR site:make.com OR site:hubspot.com OR site:microsoft.com OR site:google.com OR site:canva.com OR site:n8n.io pricing features automation official documentation'; return [{json:{topic,candidate,primary_research_failure:failed.research_failure_reason,verificationQuery}}];"
+      }
+    },
+    {
+      "id": "748ec53d-c9ec-4df8-8136-635888626b04",
+      "name": "Agent 2B — Bright Data Research Fallback",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        2460,
+        520
+      ],
+      "parameters": {
+        "promptType": "define",
+        "text": "=Synthesize a complete Prismbyte research pack from the already-fetched evidence below. Do not call tools. Evidence package: {{ JSON.stringify($json) }}. Return strict JSON with research_status, topic, search_intent, target_reader, article_angle, key_questions, key_findings, verified_facts, product_information, comparison_data, source_register (each entry: title, url, source_type, published_or_updated, accessed_at, evidence, claims_supported), claim_evidence_map, reddit_insights, competitor_analysis, content_gaps, limitations, conflicting_evidence, unsupported_claims_to_avoid, suggested_structure, research_confidence and unresolved_questions. Include only URLs and facts present in the evidence package.",
+        "options": {
+          "systemMessage": "You are Prismbyte's Bright Data research synthesis agent. Research retrieval has already been performed by deterministic n8n nodes. You have no tools and must not attempt tool calls. Synthesize only the supplied fetched page excerpts. Do not treat search snippets as verified facts. A source is official/primary only when the retrieved page is on the vendor's own domain and directly documents its product, pricing, features or policies. Return COMPLETE only with at least three distinct usable sources and at least two genuine official/primary sources. Each source must contain exact URL, title, source_type and an evidence excerpt of at least 40 characters. Otherwise return INSUFFICIENT and explain why. Strict JSON only, no Markdown fences, no trailing commas, no invented facts or URLs.",
+          "maxIterations": 1,
+          "returnIntermediateSteps": false,
+          "forceToolCallOnFirstIteration": false
+        },
+        "needsFallback": false
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "ca4cfa6f-a47e-47af-8a7d-1471c2b1c026",
+      "name": "Validate Bright Data Fallback Research",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2760,
+        520
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const raw=String($input.first()?.json?.output||'').trim();function parse(s){let t=s.trim();const a=t.indexOf('{'),b=t.lastIndexOf('}');if(a>=0&&b>a)t=t.slice(a,b+1);t=t.replace(/,\\s*([}\\]])/g,'$1');return JSON.parse(t)}let x;try{x=parse(raw)}catch(e){return [{json:{research_valid:false,research_failure_reason:'Bright Data fallback research returned invalid JSON: '+e.message}}]}const fetched=$('Aggregate Fetched Research Evidence').first().json.source_register||[];const byUrl=new Map(fetched.map(s=>[String(s.url||''),s]));const officialDomains=['zapier.com','make.com','hubspot.com','microsoft.com','google.com','canva.com','n8n.io','airtable.com','notion.so','clickup.com','asana.com','openai.com','anthropic.com','perplexity.ai','grammarly.com'];const norm=v=>String(v||'').toLowerCase().replace(/https?:\\/\\/\\S+/g,' ').replace(/[^a-z0-9]+/g,' ').trim();const src=Array.isArray(x.source_register)?x.source_register:[];const verified=[];for(const s of src){const url=String(s.url||'').trim();const fetchedSource=byUrl.get(url);const evidence=String(s.evidence||s.evidence_excerpt||'').trim();if(!/^https?:\\/\\//i.test(url)||!String(s.title||'').trim()||!fetchedSource||evidence.length<40)continue;const pageText=norm(fetchedSource.content_excerpt);const sentences=evidence.split(/(?<=[.!?])\\s+/).map(norm).filter(t=>t.length>=60);const matched=sentences.filter(t=>pageText.includes(t));if(!matched.length)continue;const hostMatch=url.match(/^https?:\\/\\/([^/:?#]+)/i);const host=hostMatch?hostMatch[1].replace(/^www\\./i,'').toLowerCase():'';const isOfficial=officialDomains.some(d=>host===d||host.endsWith('.'+d));verified.push({...s,evidence,evidence_verified:true,matched_evidence_sentences:matched.length,domain:host,is_official_vendor_domain:isOfficial});}const unique=[...new Map(verified.map(s=>[s.url,s])).values()];const official=unique.filter(s=>s.is_official_vendor_domain);const officialDomainsCount=new Set(official.map(s=>s.domain)).size;const valid=String(x.research_status||'').toUpperCase()==='COMPLETE'&&unique.length>=3&&officialDomainsCount>=2;return [{json:{...x,source_register:unique,source_count:unique.length,official_source_count:officialDomainsCount,research_valid:Boolean(valid),research_failure_reason:valid?null:'Bright Data fallback research evidence threshold not met: '+unique.length+' sources with matched fetched evidence and '+officialDomainsCount+' distinct verified vendor domains.'}}];"
+      }
+    },
+    {
+      "id": "547f7fc9-de8b-41ec-b983-0dd9cbcd0c16",
+      "name": "Check QA Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2520,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const raw=String($input.first()?.json?.output||'').trim(); const qaPackage=$('Prepare Independent QA Package').first().json; let q=null; let valid=false; try { let t=raw; const a=t.indexOf('{'),b=t.lastIndexOf('}'); if(a>=0&&b>a)t=t.slice(a,b+1); t=t.replace(/,\\s*([}\\]])/g,'$1'); q=JSON.parse(t); valid=['PASS','FAIL'].includes(q.status)&&typeof q.article_complete==='boolean'&&typeof q.factual_accuracy==='boolean'&&typeof q.source_support==='boolean'&&typeof q.editorial_quality==='boolean'&&Array.isArray(q.critical_issues)&&Array.isArray(q.unsupported_claims); } catch(e) {} return [{json:{qa_output_valid:valid,output:raw,qa_package:qaPackage,qa_validation_note:valid?null:'OpenRouter QA response was empty or invalid JSON; route to NVIDIA fallback.'}}];"
+      }
+    },
+    {
+      "id": "53a7e8fe-aaab-4787-9083-493a6dc813fb",
+      "name": "QA Result Usable?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2780,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.qa_output_valid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "81f413f3-d328-4481-a478-fc81d09e0370",
+      "name": "NVIDIA Nemotron — Fallback Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatNvidia",
+      "typeVersion": 1,
+      "position": [
+        2800,
+        760
+      ],
+      "parameters": {
+        "model": "={{ 'nvidia/nemotron-3.5-super-vl-120b-a12b' }}",
+        "options": {
+          "temperature": 0.1,
+          "maxTokens": 32000,
+          "timeout": 600000,
+          "maxRetries": 2
+        }
+      },
+      "credentials": {
+        "nvidiaApi": {
+          "id": "YX5QWgZzVmrNJnwP",
+          "name": "NVIDIA Nemotron account"
+        }
+      }
+    },
+    {
+      "id": "bd16bd76-6c0a-41de-9957-6ea334567453",
+      "name": "Agent 4B — NVIDIA QA Fallback",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        3060,
+        520
+      ],
+      "parameters": {
+        "promptType": "define",
+        "text": "=The OpenRouter QA response was empty or invalid. Independently audit this complete article against its research pack. Package: {{ JSON.stringify($json.qa_package) }}. Return strict JSON with status PASS or FAIL, boolean fields article_complete, factual_accuracy, source_support, editorial_quality, and arrays unsupported_claims, critical_issues, required_corrections, source_issues and editorial_notes.",
+        "options": {
+          "systemMessage": "You are Prismbyte's independent fallback editorial auditor. You did not write the article. Verify the complete article against the supplied research pack. Check factual accuracy, evidence support, completeness, product claims, pricing, limitations, affiliate integrity and technical format. PASS only if all required checks pass and no critical issue remains. Otherwise FAIL with specific corrections. Return valid JSON only, no Markdown fences and no trailing commas. Never publish.",
+          "maxIterations": 2,
+          "returnIntermediateSteps": false
+        }
+      }
+    },
+    {
+      "id": "8c990b21-f566-437f-a0bc-6c7234c11e5b",
+      "name": "Agent 1B — NVIDIA Idea Discovery Fallback",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        820,
+        760
+      ],
+      "parameters": {
+        "promptType": "define",
+        "text": "=OpenRouter idea discovery failed. Run a fresh Prismbyte discovery cycle as of {{ $now.toISO() }}. Search Reddit with Bright Data using site:reddit.com, fetch up to two relevant discussions, and search broader web context. Return ONLY valid JSON with topic, proposed_title, search_intent, target_reader, article_type, article_angle, why_now, reddit_evidence, community_evidence_available, discovery_sources, duplicate_risk, commercial_relevance, evidence_availability, score, recommendation and rejection_reason.",
+        "options": {
+          "systemMessage": "You are Prismbyte's NVIDIA-backed idea discovery fallback. Use Bright Data search and page fetch tools. Do not invent Reddit discussions, search volume or trends. Return one strict JSON object. Do not write or publish.",
+          "maxIterations": 6,
+          "returnIntermediateSteps": false,
+          "forceToolCallOnFirstIteration": true
+        }
+      }
+    },
+    {
+      "id": "f4a0750c-d7b8-4d61-bc3c-2b80811b69b6",
+      "name": "Agent 2A — NVIDIA Primary Research Fallback",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1320,
+        760
+      ],
+      "parameters": {
+        "promptType": "define",
+        "text": "=OpenRouter primary research failed. Research this candidate using Tavily only. Candidate: {{ JSON.stringify($('Prepare Research Input').first().json.candidate) }}. Return compact JSON only: research_status, topic, key_questions (max 5), key_findings (max 8), verified_facts (max 8), source_register (max 5; url, title, source_type, evidence max 300 characters), claim_evidence_map (max 8), limitations (max 5), suggested_structure (max 8), research_confidence and research_failure_reason.",
+        "options": {
+          "systemMessage": "You are Prismbyte's NVIDIA-backed primary research fallback. Use Tavily as the only provider. If Tavily errors, is quota-limited, or returns inadequate evidence, return research_status=INSUFFICIENT. Do not use Bright Data; the deterministic workflow handles that fallback. Return compact strict JSON only, no Markdown fences, no trailing commas. Maximum five sources, eight findings, eight verified facts and eight claim-evidence entries. Each source needs exact URL, title, source_type and evidence excerpt <=300 characters. Do not invent evidence or label third-party pages as official product sources.",
+          "maxIterations": 3,
+          "returnIntermediateSteps": false,
+          "forceToolCallOnFirstIteration": true
+        }
+      }
+    },
+    {
+      "id": "9fd34d28-55fd-4b34-8560-97b892da6fb2",
+      "name": "Agent 2C — NVIDIA Research Fallback",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        2820,
+        700
+      ],
+      "parameters": {
+        "promptType": "define",
+        "text": "=OpenRouter fallback synthesis failed. Synthesize a complete Prismbyte research pack from the already-fetched evidence: {{ JSON.stringify($('Aggregate Fetched Research Evidence').first().json) }}. Do not call tools. Return strict JSON with research_status, topic, search_intent, target_reader, article_angle, key_questions, key_findings, verified_facts, product_information, comparison_data, source_register (each entry: title, url, source_type, published_or_updated, accessed_at, evidence, claims_supported), claim_evidence_map, reddit_insights, competitor_analysis, content_gaps, limitations, conflicting_evidence, unsupported_claims_to_avoid, suggested_structure, research_confidence and unresolved_questions.",
+        "options": {
+          "systemMessage": "You are Prismbyte's NVIDIA-backed research synthesis fallback. Research retrieval has already been performed by deterministic n8n nodes. Synthesize only the supplied fetched page excerpts; do not call tools and do not use search snippets as evidence. The source package may include direct vendor pricing pages; prioritise those over comparison blogs. A source counts as official/primary only when the exact fetched URL is on the vendor's own domain and the retrieved page directly documents that vendor's own product, pricing, features or policies. Do not count a vendor's general comparison article as proof of another vendor's product claims. Return COMPLETE only with at least three distinct sources, at least two distinct vendor-owned product/pricing/documentation sources, and at least one independent source when available. For each source_register entry include exact title, exact fetched URL, source_type, and one or more verbatim evidence sentences copied from that page's content_excerpt (at least 60 characters) so deterministic validation can match them. Do not paraphrase evidence excerpts. Do not invent facts, prices, URLs, dates or source content. If thresholds are not met, return INSUFFICIENT and explain why. Strict JSON only, no Markdown fences, no trailing commas.",
+          "maxIterations": 1,
+          "returnIntermediateSteps": false,
+          "forceToolCallOnFirstIteration": false
+        }
+      }
+    },
+    {
+      "id": "5cb5170f-5453-41b1-b80a-d12d93b8a393",
+      "name": "Prepare NVIDIA Writer Fallback Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1740,
+        900
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const candidates=[]; for (const name of ['Validate NVIDIA Bright Data Research','Validate Bright Data Fallback Research','Validate Research Evidence Pack']) { try { const x=$(name).first().json; if (x && x.research_valid===true) candidates.push(x); } catch(e) {} } const research=candidates[0]; if(!research) throw new Error('Writing stopped: no validated research pack passed the deterministic evidence gate.'); return [{json:research}];"
+      }
+    },
+    {
+      "id": "fbbcedb1-f9f9-4501-b534-ace5a75d331e",
+      "name": "Agent 3B — NVIDIA Article Writer Fallback",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        2020,
+        900
+      ],
+      "parameters": {
+        "promptType": "define",
+        "text": "=OpenRouter writing failed. Write the complete Prismbyte article using this validated research pack: {{ JSON.stringify($json) }}. Return an editorial brief and exactly one fenced complete Astro Markdown article.",
+        "options": {
+          "systemMessage": "You are Prismbyte's NVIDIA-backed senior technology and software writer. Use only the supplied validated research. Do not invent features, prices, benchmarks, statistics, quotes, product tests, personal experience or affiliate relationships. Cite only exact URLs in the research pack. Produce a complete useful article with clear comparisons, trade-offs and limitations. Do not impose arbitrary word counts. Use Astro frontmatter: title, description, publishDate, category (ai-saas|automation|troubleshooting), tags, author, featuredImage, featuredImageAlt, imageSource, draft, sources, affiliateDisclosure. Use publishDate: DATE_TO_BE_SET_BY_WORKFLOW; workflow supplies authoritative date. Always draft: true. Sources must be exact supplied URLs, maximum five. Never publish or claim QA approval.",
+          "maxIterations": 2,
+          "returnIntermediateSteps": false
+        }
+      }
+    },
+    {
+      "id": "922289a2-93b2-4d7b-838b-6c5f73e5842c",
+      "name": "Bright Data Official Product Search",
+      "type": "@brightdata/n8n-nodes-brightdata.brightData",
+      "typeVersion": 1,
+      "position": [
+        1900,
+        740
+      ],
+      "parameters": {
+        "resource": "webUnlocker",
+        "operation": "WebSearch",
+        "zone": {
+          "__rl": true,
+          "mode": "list",
+          "value": "n8n_unlocker"
+        },
+        "country": {
+          "__rl": true,
+          "mode": "list",
+          "value": "us"
+        },
+        "query": "={{ $json.verificationQuery }}",
+        "page": 1,
+        "requestOptions": {
+          "timeout": 90000
+        }
+      },
+      "credentials": {
+        "brightdataApi": {
+          "id": "l5yOfpHzFED5RbQf",
+          "name": "BrightData account"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2500
+    },
+    {
+      "id": "d3311018-9654-4c14-81ac-3e56db433c74",
+      "name": "Extract Fallback URLs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2180,
+        640
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const searches=[$('Bright Data Fallback Search (Controlled)').first().json,$('Bright Data Official Product Search').first().json];const build=$('Build Official Verification Query').first().json;const preferred=(build.brands||[]).map(x=>String(x.domain||'').replace(/^www\\./,'').toLowerCase()).filter(Boolean);const all=[];for(const j of searches){const organic=j.organic||j.data?.organic||j.results?.organic||[];const rows=Array.isArray(organic)?organic:Object.values(organic||{});for(const r of rows){const url=String(r.link||r.url||r.href||'').trim();if(!/^https?:\\/\\//i.test(url)||/google\\.com\\/(goto|search)/i.test(url))continue;const host=(url.match(/^https?:\\/\\/([^/]+)/i)||[])[1]||'';const domain=host.replace(/^www\\./i,'').toLowerCase();if(!domain||domain.includes('google.com'))continue;all.push({url,title:String(r.title||''),snippet:String(r.snippet||r.description||''),source:String(r.source||''),domain,is_direct_official_url:false});}}const officialUrlMap={'zapier.com':{url:'https://zapier.com/pricing',title:'Zapier official pricing' },'make.com':{url:'https://www.make.com/en/pricing',title:'Make official pricing'},'n8n.io':{url:'https://n8n.io/pricing',title:'n8n official pricing'},'hubspot.com':{url:'https://www.hubspot.com/pricing',title:'HubSpot official pricing'},'microsoft.com':{url:'https://www.microsoft.com/en-us/power-platform/products/power-automate/pricing',title:'Microsoft Power Automate official pricing'},'google.com':{url:'https://workspace.google.com/pricing.html',title:'Google Workspace official pricing'}};for(const d of preferred){const entry=officialUrlMap[d];if(entry)all.push({url:entry.url,title:entry.title,snippet:'Direct vendor pricing page added for verification.',source:d,domain:d,is_direct_official_url:true});}const unique=[...new Map(all.map(x=>[x.url,x])).values()];unique.sort((a,b)=>Number(Boolean(b.is_direct_official_url))-Number(Boolean(a.is_direct_official_url)));const chosen=unique.slice(0,8);if(!chosen.length)throw new Error('Bright Data returned no direct, fetchable URLs; stopping fallback research.');const topic=$('Prepare Bright Data Fallback Input').first().json.topic;return chosen.map(x=>({json:{...x,topic}}));"
+      }
+    },
+    {
+      "id": "76877a99-d0d5-4788-8ef4-39a95a3b611b",
+      "name": "Fetch Bright Data Fallback Pages",
+      "type": "@brightdata/n8n-nodes-brightdata.brightData",
+      "typeVersion": 1,
+      "position": [
+        2460,
+        640
+      ],
+      "parameters": {
+        "resource": "webUnlocker",
+        "operation": "request",
+        "zone": {
+          "__rl": true,
+          "mode": "list",
+          "value": "n8n_unlocker"
+        },
+        "country": {
+          "__rl": true,
+          "mode": "list",
+          "value": "us"
+        },
+        "method": "GET",
+        "url": "={{ $json.url }}",
+        "data_format": "markdown",
+        "requestOptions": {
+          "timeout": 90000
+        }
+      },
+      "credentials": {
+        "brightdataApi": {
+          "id": "l5yOfpHzFED5RbQf",
+          "name": "BrightData account"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 2000
+    },
+    {
+      "id": "6442a4b5-81e1-4d88-9e9b-c1952bea1467",
+      "name": "Aggregate Fetched Research Evidence",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2740,
+        640
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "function strings(v,out=[]){if(typeof v==='string')out.push(v);else if(Array.isArray(v))for(const x of v)strings(x,out);else if(v&&typeof v==='object')for(const x of Object.values(v))strings(x,out);return out;}const refs=$('Extract Fallback URLs').all().map(x=>x.json);const pages=$input.all().map(x=>x.json);const sources=[];for(let i=0;i<pages.length;i++){const page=pages[i]||{};let content=strings(page).filter(s=>s.length>500).sort((a,b)=>b.length-a.length)[0]||'';const ref=refs[i]||{};if(!content||/502 Bad Gateway|403 Forbidden|Access Denied/i.test(content.slice(0,500)))continue;content=content.replace(/!\\[[^\\]]*\\]\\([^)]*\\)/g,' ').replace(/\\[([^\\]]+)\\]\\([^)]*\\)/g,'$1').replace(/https?:\\/\\/\\S+/g,' ').replace(/\\s+/g,' ').trim();const keywords=/(pricing|plans|features|automation|integrations|workflow|AI|artificial intelligence|free plan|per month|per user)/ig;const segments=[];let m;while((m=keywords.exec(content))!==null&&segments.length<8){const start=Math.max(0,m.index-350);const end=Math.min(content.length,m.index+850);const segment=content.slice(start,end);if(!segments.some(s=>Math.abs(s.index-m.index)<500))segments.push({index:m.index,text:segment});}const focused=segments.map(s=>s.text).join(' ... ');const excerpt=(focused.length>700?focused:content.slice(0,8000)).slice(0,10000);sources.push({url:ref.url||page.url||'',title:ref.title||'',domain:ref.domain||'',source_hint:ref.source||'',content_excerpt:excerpt,content_length:content.length});}const input=$('Prepare Bright Data Fallback Input').first().json;return [{json:{topic:input.topic,candidate:input.candidate,primary_research_failure:input.primary_research_failure,source_register:sources,source_count:sources.length,search_context:'Bright Data search results prioritized against vendor domains identified in the verification query, followed by direct page retrieval and focused extraction of pricing, feature and automation passages.'}}];"
+      }
+    },
+    {
+      "id": "49e1da7a-36dd-4256-9236-94bc9a2c6b14",
+      "name": "Bright Data Research Pack Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        3060,
+        640
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.research_valid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "170d34f2-f7ee-49c4-a952-0443b981f0d3",
+      "name": "Validate NVIDIA Bright Data Research",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3340,
+        900
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const raw=String($input.first()?.json?.output||'').trim();function parse(s){let t=s.trim();const a=t.indexOf('{'),b=t.lastIndexOf('}');if(a>=0&&b>a)t=t.slice(a,b+1);t=t.replace(/,\\s*([}\\]])/g,'$1');return JSON.parse(t)}let x;try{x=parse(raw)}catch(e){return [{json:{research_valid:false,research_failure_reason:'NVIDIA Bright Data research returned invalid JSON: '+e.message}}]}const fetched=$('Aggregate Fetched Research Evidence').first().json.source_register||[];const byUrl=new Map(fetched.map(s=>[String(s.url||''),s]));const officialDomains=['zapier.com','make.com','hubspot.com','microsoft.com','google.com','canva.com','n8n.io','airtable.com','notion.so','clickup.com','asana.com','openai.com','anthropic.com','perplexity.ai','grammarly.com'];const norm=v=>String(v||'').toLowerCase().replace(/https?:\\/\\/\\S+/g,' ').replace(/[^a-z0-9]+/g,' ').trim();const src=Array.isArray(x.source_register)?x.source_register:[];const verified=[];for(const s of src){const url=String(s.url||'').trim();const fetchedSource=byUrl.get(url);const evidence=String(s.evidence||s.evidence_excerpt||'').trim();if(!/^https?:\\/\\//i.test(url)||!String(s.title||'').trim()||!fetchedSource||evidence.length<40)continue;const pageText=norm(fetchedSource.content_excerpt);const sentences=evidence.split(/(?<=[.!?])\\s+/).map(norm).filter(t=>t.length>=60);const matched=sentences.filter(t=>pageText.includes(t));if(!matched.length)continue;const hostMatch=url.match(/^https?:\\/\\/([^/:?#]+)/i);const host=hostMatch?hostMatch[1].replace(/^www\\./i,'').toLowerCase():'';const isOfficial=officialDomains.some(d=>host===d||host.endsWith('.'+d));verified.push({...s,evidence,evidence_verified:true,matched_evidence_sentences:matched.length,domain:host,is_official_vendor_domain:isOfficial});}const unique=[...new Map(verified.map(s=>[s.url,s])).values()];const official=unique.filter(s=>s.is_official_vendor_domain);const officialDomainsCount=new Set(official.map(s=>s.domain)).size;const valid=String(x.research_status||'').toUpperCase()==='COMPLETE'&&unique.length>=3&&officialDomainsCount>=2;return [{json:{...x,source_register:unique,source_count:unique.length,official_source_count:officialDomainsCount,research_valid:Boolean(valid),research_failure_reason:valid?null:'NVIDIA Bright Data research evidence threshold not met: '+unique.length+' sources with matched fetched evidence and '+officialDomainsCount+' distinct verified vendor domains.'}}];"
+      }
+    },
+    {
+      "id": "1b6f8930-7624-4928-9c42-b547c93380f7",
+      "name": "Build Official Verification Query",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2180,
+        820
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const first=$input.first().json; const organic=first.organic||first.data?.organic||[]; const corpus=JSON.stringify(organic).toLowerCase(); const vendors=[{brand:'ChatGPT',domain:'openai.com'},{brand:'Claude',domain:'anthropic.com'},{brand:'Gemini',domain:'google.com'},{brand:'Zapier',domain:'zapier.com'},{brand:'Canva',domain:'canva.com'},{brand:'Notion',domain:'notion.so'},{brand:'Copilot',domain:'microsoft.com'},{brand:'Asana',domain:'asana.com'},{brand:'n8n',domain:'n8n.io'},{brand:'Make',domain:'make.com'},{brand:'HubSpot',domain:'hubspot.com'},{brand:'Perplexity',domain:'perplexity.ai'},{brand:'Grammarly',domain:'grammarly.com'},{brand:'OpenRouter',domain:'openrouter.ai'}]; let found=vendors.filter(v=>corpus.includes(v.brand.toLowerCase())).slice(0,7); if(!found.length) found=[{brand:'Zapier',domain:'zapier.com'},{brand:'Make',domain:'make.com'},{brand:'n8n',domain:'n8n.io'},{brand:'HubSpot',domain:'hubspot.com'},{brand:'Microsoft Power Automate',domain:'microsoft.com'},{brand:'Google Workspace',domain:'google.com'}]; const sites=found.map(v=>'site:'+v.domain).join(' OR '); const topic=$('Prepare Bright Data Fallback Input').first().json.topic; const verificationQuery=topic+' official pricing documentation product features automation ('+sites+')'; return [{json:{topic,brands:found,verificationQuery}}];"
+      }
+    },
+    {
+      "id": "d114d717-bd80-425b-bfc8-2e31ad1f3ac7",
+      "name": "NVIDIA Research Gate Passed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        3620,
+        900
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.research_valid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "ade092a1-086f-4e0b-b9c7-b062255f471d",
+      "name": "Research Gate Failure — Draft Halted",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3900,
+        1100
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const x=$input.first()?.json||{}; return [{json:{benchmark_status:'HOLD_INSUFFICIENT_RESEARCH',topic:x.topic||$('Prepare Bright Data Fallback Input').first().json.topic,reason:x.research_failure_reason||x.explanation||'Neither primary nor fallback research met the evidence threshold.',research_valid:false,writing_performed:false,qa_performed:false,publication_performed:false}}];"
+      }
+    }
+  ],
+  "connections": {
+    "Agent 1 — Autonomous Idea Discovery": {
+      "main": [
+        [
+          {
+            "node": "Validate and Normalise Idea",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Agent 1B — NVIDIA Idea Discovery Fallback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter Free — Idea Discovery": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Agent 1 — Autonomous Idea Discovery",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bright Data Reddit and Web Search": {
+      "ai_tool": [
+        [
+          {
+            "node": "Agent 1 — Autonomous Idea Discovery",
+            "type": "ai_tool",
+            "index": 0
+          },
+          {
+            "node": "Agent 1B — NVIDIA Idea Discovery Fallback",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bright Data Reddit Discussion Fetch": {
+      "ai_tool": [
+        [
+          {
+            "node": "Agent 1 — Autonomous Idea Discovery",
+            "type": "ai_tool",
+            "index": 0
+          },
+          {
+            "node": "Agent 1B — NVIDIA Idea Discovery Fallback",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agent 2 — Research Specialist": {
+      "main": [
+        [
+          {
+            "node": "Validate Research Evidence Pack",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Agent 2A — NVIDIA Primary Research Fallback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter Free — Research": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Agent 2 — Research Specialist",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Agent 2B — Bright Data Research Fallback",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tavily Primary Research": {
+      "ai_tool": [
+        [
+          {
+            "node": "Agent 2 — Research Specialist",
+            "type": "ai_tool",
+            "index": 0
+          },
+          {
+            "node": "Agent 2A — NVIDIA Primary Research Fallback",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agent 3 — Prismbyte Article Writer": {
+      "main": [
+        [
+          {
+            "node": "Prepare Independent QA Package",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare NVIDIA Writer Fallback Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter Free — Article Writer": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Agent 3 — Prismbyte Article Writer",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Independent QA Package": {
+      "main": [
+        [
+          {
+            "node": "Agent 4 — Independent Editorial QA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter Free — Independent QA": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Agent 4 — Independent Editorial QA",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Benchmark Start": {
+      "main": [
+        [
+          {
+            "node": "Manual Test Topic",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Daily Autonomous Discovery Schedule": {
+      "main": [
+        [
+          {
+            "node": "Agent 1 — Autonomous Idea Discovery",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Test Topic": {
+      "main": [
+        [
+          {
+            "node": "Prepare Research Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate and Normalise Idea": {
+      "main": [
+        [
+          {
+            "node": "Prepare Research Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Research Input": {
+      "main": [
+        [
+          {
+            "node": "Agent 2 — Research Specialist",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Research Evidence Pack": {
+      "main": [
+        [
+          {
+            "node": "Research Pack Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Research Pack Valid?": {
+      "main": [
+        [
+          {
+            "node": "Agent 3 — Prismbyte Article Writer",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare Bright Data Fallback Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bright Data Official Page Fetch": {
+      "ai_tool": [
+        [
+          {
+            "node": "Agent 1 — Autonomous Idea Discovery",
+            "type": "ai_tool",
+            "index": 0
+          },
+          {
+            "node": "Agent 1B — NVIDIA Idea Discovery Fallback",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agent 2B — Bright Data Research Fallback": {
+      "main": [
+        [
+          {
+            "node": "Validate Bright Data Fallback Research",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Agent 2C — NVIDIA Research Fallback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Bright Data Fallback Research": {
+      "main": [
+        [
+          {
+            "node": "Bright Data Research Pack Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agent 4 — Independent Editorial QA": {
+      "main": [
+        [
+          {
+            "node": "Check QA Output",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check QA Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check QA Output": {
+      "main": [
+        [
+          {
+            "node": "QA Result Usable?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "QA Result Usable?": {
+      "main": [
+        [
+          {
+            "node": "Final Benchmark Result — No Publishing",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Agent 4B — NVIDIA QA Fallback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agent 4B — NVIDIA QA Fallback": {
+      "main": [
+        [
+          {
+            "node": "Final Benchmark Result — No Publishing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agent 1B — NVIDIA Idea Discovery Fallback": {
+      "main": [
+        [
+          {
+            "node": "Validate and Normalise Idea",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agent 2A — NVIDIA Primary Research Fallback": {
+      "main": [
+        [
+          {
+            "node": "Validate Research Evidence Pack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "NVIDIA Nemotron — Fallback Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Agent 4B — NVIDIA QA Fallback",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Agent 1B — NVIDIA Idea Discovery Fallback",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Agent 2A — NVIDIA Primary Research Fallback",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Agent 3B — NVIDIA Article Writer Fallback",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Agent 2C — NVIDIA Research Fallback",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare NVIDIA Writer Fallback Input": {
+      "main": [
+        [
+          {
+            "node": "Agent 3B — NVIDIA Article Writer Fallback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agent 3B — NVIDIA Article Writer Fallback": {
+      "main": [
+        [
+          {
+            "node": "Prepare Independent QA Package",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Bright Data Fallback Input": {
+      "main": [
+        [
+          {
+            "node": "Bright Data Fallback Search (Controlled)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Fallback URLs": {
+      "main": [
+        [
+          {
+            "node": "Fetch Bright Data Fallback Pages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Bright Data Fallback Pages": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Fetched Research Evidence",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Fetched Research Evidence": {
+      "main": [
+        [
+          {
+            "node": "Agent 2B — Bright Data Research Fallback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bright Data Research Pack Valid?": {
+      "main": [
+        [
+          {
+            "node": "Agent 3 — Prismbyte Article Writer",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Agent 2C — NVIDIA Research Fallback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agent 2C — NVIDIA Research Fallback": {
+      "main": [
+        [
+          {
+            "node": "Validate NVIDIA Bright Data Research",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bright Data Official Product Search": {
+      "main": [
+        [
+          {
+            "node": "Extract Fallback URLs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bright Data Fallback Search (Controlled)": {
+      "main": [
+        [
+          {
+            "node": "Build Official Verification Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Official Verification Query": {
+      "main": [
+        [
+          {
+            "node": "Bright Data Official Product Search",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate NVIDIA Bright Data Research": {
+      "main": [
+        [
+          {
+            "node": "NVIDIA Research Gate Passed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "NVIDIA Research Gate Passed?": {
+      "main": [
+        [
+          {
+            "node": "Agent 3 — Prismbyte Article Writer",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Research Gate Failure — Draft Halted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "timezone": "Africa/Lagos",
+    "saveExecutionProgress": true,
+    "saveDataErrorExecution": "all"
+  }
+}
