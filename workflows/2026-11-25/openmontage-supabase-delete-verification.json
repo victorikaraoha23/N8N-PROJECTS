@@ -1,0 +1,68 @@
+{
+  "name": "OpenMontage - Supabase Delete Verification",
+  "nodes": [
+    {
+      "id": "3b290e1d-cfc6-42be-8827-841195bec77d",
+      "name": "Manual Verification Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "9d96c434-928f-429b-b30f-ee763911e421",
+      "name": "Verify Temporary Record Is Absent",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        540,
+        300
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "getAll",
+        "authentication": "secretKey",
+        "tableId": "products",
+        "returnAll": false,
+        "limit": 1,
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "canonical_url",
+              "condition": "eq",
+              "keyValue": "https://openmontage.invalid/connectivity-test-2026-11-11"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "VIp2iiJEEE7xS20g",
+          "name": "Supabase account 2"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Manual Verification Trigger": {
+      "main": [
+        [
+          {
+            "node": "Verify Temporary Record Is Absent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  }
+}
