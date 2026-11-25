@@ -1,0 +1,769 @@
+{
+  "name": "Prismbyte WF-01 Isolated Test Harness",
+  "nodes": [
+    {
+      "id": "650fc071-54dc-49e9-a6d4-3f083ccf7fbc",
+      "name": "Run Telegram Queue Integration Test",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        200,
+        760
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "b564b8df-99e7-4346-8e35-60b438bab586",
+      "name": "Prepare Test Review Records",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        420,
+        760
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Africa/Lagos',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());\nconst make=(id,topic,slug,title)=>{const markdown=['---','title: \"'+title+'\"','description: \"Isolated test fixture only.\"','publishDate: '+today,'category: \"automation\"','draft: true','---','','# Test fixture',''].join(String.fromCharCode(10));return {article_id:id,topic,slug,article_markdown:markdown,source_urls_json:'[]',qa_status:'PASS',qa_flags_json:JSON.stringify({testOnly:true}),review_status:'awaiting_review_notice',telegram_delivery_status:'notice_pending',telegram_message_ids:'[]',review_sent_at:null,deadline_at:null,decision_at:null,decision_source:null,publish_status:'awaiting_review_notice',published_commit:null,published_url:null,last_error:null};};\nreturn [{json:make('PB-ISOLATED-APPROVE-001','Isolated Telegram approval test','isolated-telegram-approval-test','Isolated Telegram Approval Test')},{json:make('PB-ISOLATED-REJECT-001','Isolated Telegram rejection test','isolated-telegram-rejection-test','Isolated Telegram Rejection Test')}];"
+      }
+    },
+    {
+      "id": "6c2de551-ad4e-43a2-84c1-9f1fa6ccdf85",
+      "name": "Persist Test Review Records",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        660,
+        760
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "upsert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "Ml5In0Q2Ls5jUoVJ"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "article_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.article_id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "article_id": "={{ $json.article_id }}",
+            "topic": "={{ $json.topic }}",
+            "slug": "={{ $json.slug }}",
+            "article_markdown": "={{ $json.article_markdown }}",
+            "source_urls_json": "={{ $json.source_urls_json }}",
+            "qa_status": "={{ $json.qa_status }}",
+            "qa_flags_json": "={{ $json.qa_flags_json }}",
+            "review_status": "={{ $json.review_status }}",
+            "telegram_delivery_status": "={{ $json.telegram_delivery_status }}",
+            "telegram_message_ids": "={{ $json.telegram_message_ids }}",
+            "review_sent_at": "={{ $json.review_sent_at }}",
+            "deadline_at": "={{ $json.deadline_at }}",
+            "decision_at": "={{ $json.decision_at }}",
+            "decision_source": "={{ $json.decision_source }}",
+            "publish_status": "={{ $json.publish_status }}",
+            "published_commit": "={{ $json.published_commit }}",
+            "published_url": "={{ $json.published_url }}",
+            "last_error": "={{ $json.last_error }}"
+          },
+          "schema": [
+            {
+              "id": "article_id",
+              "displayName": "article_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "topic",
+              "displayName": "topic",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "slug",
+              "displayName": "slug",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "article_markdown",
+              "displayName": "article_markdown",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "source_urls_json",
+              "displayName": "source_urls_json",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "qa_status",
+              "displayName": "qa_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "qa_flags_json",
+              "displayName": "qa_flags_json",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "review_status",
+              "displayName": "review_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "telegram_delivery_status",
+              "displayName": "telegram_delivery_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "telegram_message_ids",
+              "displayName": "telegram_message_ids",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "review_sent_at",
+              "displayName": "review_sent_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "date",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "deadline_at",
+              "displayName": "deadline_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "date",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "decision_at",
+              "displayName": "decision_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "date",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "decision_source",
+              "displayName": "decision_source",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "publish_status",
+              "displayName": "publish_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "published_commit",
+              "displayName": "published_commit",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "published_url",
+              "displayName": "published_url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "last_error",
+              "displayName": "last_error",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "e7426890-c35b-4d5d-8469-2ce1b606cf62",
+      "name": "Build Test Telegram Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        760
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "return [{json:{chatId:7392605484,text:'PRISMBYTE — ISOLATED TELEGRAM/QUEUE TEST\\\\n\\\\nTEST ONLY. No real article is being reviewed or published.\\\\n\\\\nTest records: PB-ISOLATED-APPROVE-001 and PB-ISOLATED-REJECT-001.\\\\n\\\\nThe next message contains test instructions. Please do not reply with approval commands; the active production bot is not being used for this test.'}}];"
+      }
+    },
+    {
+      "id": "be85bf70-71e2-4664-8864-a5d3211b559e",
+      "name": "Send Test Review Summary",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1140,
+        760
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $json.chatId }}",
+        "text": "={{ $json.text }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "disable_web_page_preview": true
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "q7UPlO6TvQBq87lT",
+          "name": "prismbyte telegram bot"
+        }
+      },
+      "webhookId": "bf4266c2-59c8-4458-826d-128d30aa01db"
+    },
+    {
+      "id": "6cfe70db-2233-4237-b6ef-c929e91dd77f",
+      "name": "Build Test Telegram Instructions",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1380,
+        760
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "return [{json:{chatId:7392605484,text:'TEST INSTRUCTIONS\\\\n\\\\nPB-ISOLATED-APPROVE-001 will receive a simulated /approve decision.\\\\nPB-ISOLATED-REJECT-001 will receive a simulated /reject decision.\\\\n\\\\nThe harness verifies both decisions in a separate test table, with a 12-hour deadline and two Telegram delivery IDs. This message is informational only; do not send commands in reply.'}}];"
+      }
+    },
+    {
+      "id": "f9016a4f-daeb-4448-8d34-cb2b42a3cb93",
+      "name": "Send Test Review Instructions",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1620,
+        760
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $json.chatId }}",
+        "text": "={{ $json.text }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "disable_web_page_preview": true
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "q7UPlO6TvQBq87lT",
+          "name": "prismbyte telegram bot"
+        }
+      },
+      "webhookId": "d015ffe2-2673-4a3d-8913-be6b677e8cdb"
+    },
+    {
+      "id": "cc3ff17a-2673-4ed3-bc35-27b742e09f3f",
+      "name": "Attach Successful Delivery Evidence",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1860,
+        760
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const getId=name=>{const x=$(name).first().json;const id=x.result?.message_id??x.message_id;if(!Number.isInteger(id))throw new Error(name+' did not return message_id');return id;}; const ids=[getId('Send Test Review Summary'),getId('Send Test Review Instructions')];const now=Date.now();return $('Prepare Test Review Records').all().map(x=>({json:{article_id:x.json.article_id,telegram_delivery_status:'delivered',telegram_message_ids:JSON.stringify(ids),review_sent_at:new Date(now).toISOString(),deadline_at:new Date(now+12*60*60*1000).toISOString()}}));"
+      }
+    },
+    {
+      "id": "88d91593-d3c2-4509-8f00-fa7041651a3e",
+      "name": "Update Test Review Delivery State",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2100,
+        760
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "Ml5In0Q2Ls5jUoVJ"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "article_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.article_id }}"
+            },
+            {
+              "keyName": "review_status",
+              "condition": "eq",
+              "keyValue": "awaiting_review_notice"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "review_status": "pending_review",
+            "telegram_delivery_status": "={{ $json.telegram_delivery_status }}",
+            "telegram_message_ids": "={{ $json.telegram_message_ids }}",
+            "review_sent_at": "={{ $json.review_sent_at }}",
+            "deadline_at": "={{ $json.deadline_at }}",
+            "publish_status": "pending_review"
+          },
+          "schema": [
+            {
+              "id": "review_status",
+              "displayName": "review_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "telegram_delivery_status",
+              "displayName": "telegram_delivery_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "telegram_message_ids",
+              "displayName": "telegram_message_ids",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "review_sent_at",
+              "displayName": "review_sent_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "date",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "deadline_at",
+              "displayName": "deadline_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "date",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "publish_status",
+              "displayName": "publish_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "da58c995-2663-43de-a0d1-d486871bcba9",
+      "name": "Read Test Review Records",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2340,
+        760
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "Ml5In0Q2Ls5jUoVJ"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "article_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.article_id }}"
+            }
+          ]
+        },
+        "returnAll": false,
+        "limit": 1
+      }
+    },
+    {
+      "id": "e5c078ad-35cd-413e-8559-39a20190764f",
+      "name": "Validate Simulated Telegram Decisions",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2580,
+        760
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const now=Date.now();\nreturn $input.all().map(x=>{\n const row=x.json;\n const command=(row.article_id==='PB-ISOLATED-APPROVE-001'?'/approve ':'/reject ')+row.article_id;\n const msg={text:command,chat:{id:7392605484,type:'private'},from:{id:7392605484}};\n const parts=String(msg.text||'').trim().split(' ').filter(Boolean);\n const cmd=String(parts[0]||'').split('@')[0].toLowerCase();\n const parsed={decision:cmd==='/approve'?'approve':cmd==='/reject'?'reject':'',article_id:String(parts[1]||'').trim()};\n const authorized=String(msg.chat.id)==='7392605484'&&String(msg.from.id)==='7392605484'&&msg.chat.type==='private';\n const valid=/^PB-[A-Za-z0-9_-]+$/.test(parsed.article_id);\n if(!authorized||!valid||!parsed.decision||parsed.article_id!==row.article_id||row.qa_status!=='PASS'||row.review_status!=='pending_review'||!Number.isFinite(Date.parse(row.deadline_at))||now>=Date.parse(row.deadline_at)) throw new Error('Decision validation failed for '+row.article_id);\n return {json:{article_id:row.article_id,review_status:parsed.decision==='approve'?'approved':'rejected',decision_at:new Date(now).toISOString(),decision_source:'telegram',publish_status:parsed.decision==='approve'?'approved_waiting_publish':'blocked_rejected'}};\n});"
+      }
+    },
+    {
+      "id": "d83a2734-f5ac-470c-af3a-14f4ec8b47cf",
+      "name": "Update Test Review Decisions",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2820,
+        760
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "Ml5In0Q2Ls5jUoVJ"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "article_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.article_id }}"
+            },
+            {
+              "keyName": "review_status",
+              "condition": "eq",
+              "keyValue": "pending_review"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "review_status": "={{ $json.review_status }}",
+            "decision_at": "={{ $json.decision_at }}",
+            "decision_source": "={{ $json.decision_source }}",
+            "publish_status": "={{ $json.publish_status }}"
+          },
+          "schema": [
+            {
+              "id": "review_status",
+              "displayName": "review_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "decision_at",
+              "displayName": "decision_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "date",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "decision_source",
+              "displayName": "decision_source",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "publish_status",
+              "displayName": "publish_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "352228cd-51e5-491b-baf3-3ed25fa3052a",
+      "name": "Read Back Test Review Decisions",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        3060,
+        760
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "Ml5In0Q2Ls5jUoVJ"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "article_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.article_id }}"
+            }
+          ]
+        },
+        "returnAll": false,
+        "limit": 1
+      }
+    },
+    {
+      "id": "42027046-99b1-464f-a630-a7eecda74898",
+      "name": "Assert Persisted Test Decisions",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3300,
+        760
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const rows=$input.all().map(x=>x.json);const expected={'PB-ISOLATED-APPROVE-001':['approved','approved_waiting_publish'],'PB-ISOLATED-REJECT-001':['rejected','blocked_rejected']};const checks=[];for(const [id,s] of Object.entries(expected)){const r=rows.find(x=>x.article_id===id);checks.push({name:id+' persisted',passed:!!r},{name:id+' decision state',passed:!!r&&r.review_status===s[0]&&r.publish_status===s[1]},{name:id+' Telegram source',passed:!!r&&r.decision_source==='telegram'});let ids=[];try{ids=JSON.parse(r?.telegram_message_ids||'[]')}catch{}checks.push({name:id+' delivery IDs',passed:!!r&&r.telegram_delivery_status==='delivered'&&ids.length===2&&ids.every(Number.isInteger)});const sent=Date.parse(r?.review_sent_at||'');const deadline=Date.parse(r?.deadline_at||'');checks.push({name:id+' exact 12-hour deadline',passed:Number.isFinite(sent)&&Number.isFinite(deadline)&&deadline===sent+12*60*60*1000});}const failed=checks.filter(x=>!x.passed);return [{json:{suite:'Prismbyte isolated Telegram + persistent review queue integration',total:checks.length,passed:checks.length-failed.length,failed:failed.length,result:failed.length?'FAIL':'PASS',checks,records:rows.map(x=>({article_id:x.article_id,review_status:x.review_status,publish_status:x.publish_status,telegram_delivery_status:x.telegram_delivery_status,telegram_message_ids:x.telegram_message_ids,review_sent_at:x.review_sent_at,deadline_at:x.deadline_at,decision_at:x.decision_at,decision_source:x.decision_source}))}}];"
+      }
+    }
+  ],
+  "connections": {
+    "Run Telegram Queue Integration Test": {
+      "main": [
+        [
+          {
+            "node": "Prepare Test Review Records",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Test Review Records": {
+      "main": [
+        [
+          {
+            "node": "Persist Test Review Records",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Persist Test Review Records": {
+      "main": [
+        [
+          {
+            "node": "Build Test Telegram Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Test Telegram Summary": {
+      "main": [
+        [
+          {
+            "node": "Send Test Review Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Test Review Summary": {
+      "main": [
+        [
+          {
+            "node": "Build Test Telegram Instructions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Test Telegram Instructions": {
+      "main": [
+        [
+          {
+            "node": "Send Test Review Instructions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Test Review Instructions": {
+      "main": [
+        [
+          {
+            "node": "Attach Successful Delivery Evidence",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Attach Successful Delivery Evidence": {
+      "main": [
+        [
+          {
+            "node": "Update Test Review Delivery State",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Test Review Delivery State": {
+      "main": [
+        [
+          {
+            "node": "Read Test Review Records",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Test Review Records": {
+      "main": [
+        [
+          {
+            "node": "Validate Simulated Telegram Decisions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Simulated Telegram Decisions": {
+      "main": [
+        [
+          {
+            "node": "Update Test Review Decisions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Test Review Decisions": {
+      "main": [
+        [
+          {
+            "node": "Read Back Test Review Decisions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Back Test Review Decisions": {
+      "main": [
+        [
+          {
+            "node": "Assert Persisted Test Decisions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  }
+}
