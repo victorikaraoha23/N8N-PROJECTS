@@ -1,0 +1,62 @@
+{
+  "name": "Prismbyte — TEMP WF-99 Unmatched Test Cleanup",
+  "nodes": [
+    {
+      "id": "62ceb720-f815-4787-a0cf-5fe9907e9407",
+      "name": "Run Unmatched Test Cleanup",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "ced270f0-7c86-4fb9-8239-5c194ee98849",
+      "name": "Delete Unmatched Test Event",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "deleteRows",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "QJE6b6j6MQcTdjVu"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "event_id",
+              "condition": "eq",
+              "keyValue": "ERR-593"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Run Unmatched Test Cleanup": {
+      "main": [
+        [
+          {
+            "node": "Delete Unmatched Test Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  }
+}
