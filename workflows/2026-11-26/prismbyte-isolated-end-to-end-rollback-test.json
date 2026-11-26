@@ -1,0 +1,266 @@
+{
+  "name": "Prismbyte — Isolated End-to-End Rollback Test",
+  "nodes": [
+    {
+      "id": "7e18b861-7b66-4b39-8880-fe764aff8440",
+      "name": "Start Isolated End-to-End Rollback Test",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "a7422e19-2522-4aff-8d54-ca48d3cd8002",
+      "name": "Simulate Article Committed as Published on Test Branch",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1.1,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "resource": "file",
+        "operation": "edit",
+        "authentication": "accessToken",
+        "owner": {
+          "__rl": true,
+          "mode": "name",
+          "value": "victorikaraoha23"
+        },
+        "repository": {
+          "__rl": true,
+          "mode": "name",
+          "value": "prismbyte"
+        },
+        "filePath": "src/content/articles/prismbyte-wf01-github-node-test-do-not-publish.md",
+        "binaryData": false,
+        "fileContent": "---\ntitle: \"Prismbyte WF-01 GitHub Node Test — DO NOT PUBLISH\"\ndescription: \"Synthetic integration fixture for testing the native n8n GitHub node on a temporary branch only.\"\npublishDate: 2026-11-23\ncategory: \"automation\"\ndraft: false\n---\n\n# Prismbyte WF-01 GitHub Node Test\n\n> **TEST FIXTURE — DO NOT PUBLISH.** This file must never be merged into main or published.\n\nSynthetic precondition: fixture temporarily marked draft:false on the isolated test branch.\n",
+        "commitMessage": "Isolated end-to-end rollback test: simulate published article state on temporary branch",
+        "additionalParameters": {
+          "branch": {
+            "branch": "automation/wf01-isolated-test-20261123"
+          }
+        }
+      },
+      "credentials": {
+        "githubApi": {
+          "id": "n7jUeXRd8ZbdEArn",
+          "name": "GitHub account"
+        }
+      },
+      "webhookId": "47585e87-f53a-4e4f-bba0-9675af20a1d2"
+    },
+    {
+      "id": "74bed3cb-fa58-4b74-bdfa-bf66b3b8fc6f",
+      "name": "Simulate Deployment Verification Failure and Prepare Rollback",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "return [{json:{article_id:'ROLLBACK-TEST-001',articleMarkdown:\"---\\ntitle: \\\"Prismbyte WF-01 GitHub Node Test — DO NOT PUBLISH\\\"\\ndescription: \\\"Synthetic integration fixture for testing the native n8n GitHub node on a temporary branch only.\\\"\\npublishDate: 2026-11-23\\ncategory: \\\"automation\\\"\\ndraft: true\\n---\\n\\n# Prismbyte WF-01 GitHub Node Test\\n\\n> **TEST FIXTURE — DO NOT PUBLISH.** This file must never be merged into main or published.\\n\\nNative n8n end-to-end rollback test: restored to draft:true after synthetic deployment verification failure.\\n\",failureReason:'Synthetic deployment verification failure — isolated end-to-end test only.'}}];"
+      }
+    },
+    {
+      "id": "6ab3cb26-6957-4dd8-b0c0-a8ec4b5b5327",
+      "name": "Restore Test Fixture to Draft on Temporary Branch",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1.1,
+      "position": [
+        672,
+        0
+      ],
+      "parameters": {
+        "resource": "file",
+        "operation": "edit",
+        "authentication": "accessToken",
+        "owner": {
+          "__rl": true,
+          "mode": "name",
+          "value": "victorikaraoha23"
+        },
+        "repository": {
+          "__rl": true,
+          "mode": "name",
+          "value": "prismbyte"
+        },
+        "filePath": "src/content/articles/prismbyte-wf01-github-node-test-do-not-publish.md",
+        "binaryData": false,
+        "fileContent": "={{ $json.articleMarkdown }}",
+        "commitMessage": "Isolated end-to-end rollback test: restore draft:true after simulated deployment failure",
+        "additionalParameters": {
+          "branch": {
+            "branch": "automation/wf01-isolated-test-20261123"
+          }
+        }
+      },
+      "credentials": {
+        "githubApi": {
+          "id": "n7jUeXRd8ZbdEArn",
+          "name": "GitHub account"
+        }
+      },
+      "webhookId": "c1ab4e19-08de-4c71-bb14-0476f1ade6dd"
+    },
+    {
+      "id": "51071cb5-bebd-47ce-82a1-923ec3c2d7fd",
+      "name": "Update Isolated Rollback Test Queue Record",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        896,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "ZH4y9mbyd0YcTokM"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "article_id",
+              "condition": "eq",
+              "keyValue": "ROLLBACK-TEST-001"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "publish_status": "deploy_failed_draft_restored",
+            "published_commit": "={{ $json.commit.sha }}",
+            "published_url": "",
+            "last_error": "Synthetic deployment verification failure — isolated end-to-end test only."
+          },
+          "schema": [
+            {
+              "id": "publish_status",
+              "displayName": "publish_status",
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "published_commit",
+              "displayName": "published_commit",
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "published_url",
+              "displayName": "published_url",
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "last_error",
+              "displayName": "last_error",
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "15208a8b-e0f2-4b11-abd8-3360d0481cae",
+      "name": "Notify Isolated End-to-End Rollback Result",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1120,
+        0
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "7392605484",
+        "text": "={{ \"PRISMBYTE TEST — END-TO-END ROLLBACK COMPLETED\\n\\nThe isolated fixture was first set to draft:false, then a synthetic deployment-verification failure was simulated. The native GitHub node restored draft:true on the temporary test branch.\\n\\nRollback commit: \" + $(\"Restore Test Fixture to Draft on Temporary Branch\").first().json.commit.sha + \"\\nQueue status: deploy_failed_draft_restored\\nPublished URL: cleared\\nBranch: automation/wf01-isolated-test-20261123\\n\\nNo production article, main branch, live website, or Cloudflare deployment was touched.\" }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "disable_web_page_preview": true,
+          "parse_mode": "HTML"
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "q7UPlO6TvQBq87lT",
+          "name": "prismbyte telegram bot"
+        }
+      },
+      "webhookId": "ff497b3b-61d4-42fa-80b9-1dbc05e9e2eb"
+    }
+  ],
+  "connections": {
+    "Start Isolated End-to-End Rollback Test": {
+      "main": [
+        [
+          {
+            "node": "Simulate Article Committed as Published on Test Branch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simulate Article Committed as Published on Test Branch": {
+      "main": [
+        [
+          {
+            "node": "Simulate Deployment Verification Failure and Prepare Rollback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simulate Deployment Verification Failure and Prepare Rollback": {
+      "main": [
+        [
+          {
+            "node": "Restore Test Fixture to Draft on Temporary Branch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Restore Test Fixture to Draft on Temporary Branch": {
+      "main": [
+        [
+          {
+            "node": "Update Isolated Rollback Test Queue Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Isolated Rollback Test Queue Record": {
+      "main": [
+        [
+          {
+            "node": "Notify Isolated End-to-End Rollback Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  }
+}
