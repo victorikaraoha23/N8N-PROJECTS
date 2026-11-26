@@ -1,0 +1,111 @@
+{
+  "name": "Prismbyte — Emergency Hold PB-527",
+  "nodes": [
+    {
+      "id": "158d5477-df6c-4b86-a81a-a920a79daaf0",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "fb943586-b227-4965-a09c-f05657c522ad",
+      "name": "Hold PB-527 — Block Automatic Publication",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        560,
+        300
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "XEF45ga6YPLG0e3q"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "article_id",
+              "condition": "eq",
+              "keyValue": "PB-527"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "qa_status": "HOLD",
+            "qa_flags_json": "{\"status\":\"HOLD\",\"autoPublishEligible\":false,\"reason\":\"Independent editorial review found material factual inaccuracies. Do not publish.\"}",
+            "review_status": "hold_qa_failed",
+            "deadline_at": null,
+            "publish_status": "blocked_qa",
+            "last_error": "PB-527 blocked after independent review found material factual inaccuracies. Requires corrected NVIDIA revision and fresh independent QA."
+          },
+          "schema": [
+            {
+              "id": "qa_status",
+              "displayName": "qa_status",
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "qa_flags_json",
+              "displayName": "qa_flags_json",
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "review_status",
+              "displayName": "review_status",
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "deadline_at",
+              "displayName": "deadline_at",
+              "type": "date",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "publish_status",
+              "displayName": "publish_status",
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "last_error",
+              "displayName": "last_error",
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Hold PB-527 — Block Automatic Publication",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  }
+}
