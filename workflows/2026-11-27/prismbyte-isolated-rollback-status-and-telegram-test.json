@@ -1,0 +1,293 @@
+{
+  "name": "Prismbyte — Isolated Rollback Status and Telegram Test",
+  "nodes": [
+    {
+      "id": "ada9bca6-ff12-4d41-94dd-07b77e2e128e",
+      "name": "Start Rollback Status and Telegram Test",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        96
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "8eccb65b-4a1d-4ac2-8b28-1242071effe6",
+      "name": "Prepare Success and Failure Test Cases",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        96
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "return [{json:{testPath:'success',article_id:'ROLLBACK-TEST-001',published_commit:'test-rollback-commit-abc123',last_error:'Synthetic deployment verification failure — isolated test only.'}},{json:{testPath:'failure',article_id:'ROLLBACK-TEST-001'}}];"
+      }
+    },
+    {
+      "id": "3a0ea0af-b294-4670-ace2-288036a44716",
+      "name": "Route Success and Failure Tests",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        448,
+        96
+      ],
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.testPath }}",
+              "rightValue": "success",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "30330db3-042c-474c-b71d-5a7174d849d2",
+      "name": "Update Isolated Rollback Status — Success Path",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        672,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "ZH4y9mbyd0YcTokM"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "article_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.article_id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "publish_status": "deploy_failed_draft_restored",
+            "published_commit": "={{ $json.published_commit }}",
+            "published_url": "",
+            "last_error": "={{ $json.last_error }}"
+          },
+          "schema": [
+            {
+              "id": "publish_status",
+              "displayName": "publish_status",
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "published_commit",
+              "displayName": "published_commit",
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "published_url",
+              "displayName": "published_url",
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "last_error",
+              "displayName": "last_error",
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "423344fc-1d1d-4809-8a3d-07f9ff8b7855",
+      "name": "Telegram — Rollback Success Test",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        896,
+        0
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "7392605484",
+        "text": "PRISMBYTE TEST — ROLLBACK SUCCESS PATH\n\nThe isolated Data Table update node completed successfully. Test row ROLLBACK-TEST-001 was set to deploy_failed_draft_restored, the rollback commit was recorded, published_url was cleared, and the synthetic failure reason was stored. No production article was changed.",
+        "additionalFields": {
+          "appendAttribution": false,
+          "disable_web_page_preview": true
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "q7UPlO6TvQBq87lT",
+          "name": "prismbyte telegram bot"
+        }
+      },
+      "webhookId": "c8b1c27e-2cbc-4eaa-801e-92607818dae5"
+    },
+    {
+      "id": "a237de78-d1a0-4bd4-a428-c046b4c66b7e",
+      "name": "Intentionally Fail Isolated Data Table Update",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        672,
+        192
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "ZH4y9mbyd0YcTokM"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "column_that_does_not_exist",
+              "condition": "eq",
+              "keyValue": "ROLLBACK-TEST-001"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "not_a_real_column": "rollback_failed"
+          },
+          "schema": [
+            {
+              "id": "not_a_real_column",
+              "displayName": "not_a_real_column",
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "9c3b9069-958b-4519-a3ca-41d968f6792a",
+      "name": "Telegram — Rollback Status Failure Test",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        896,
+        192
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "7392605484",
+        "text": "PRISMBYTE TEST — ROLLBACK STATUS UPDATE FAILED\n\nThe isolated Data Table update was deliberately configured with a nonexistent column. This message confirms the node error output reaches the Telegram critical-alert path. This is an intentional test, not a production incident.",
+        "additionalFields": {
+          "appendAttribution": false,
+          "disable_web_page_preview": true
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "q7UPlO6TvQBq87lT",
+          "name": "prismbyte telegram bot"
+        }
+      },
+      "webhookId": "02059245-5650-49b5-b519-b697f68595f8"
+    }
+  ],
+  "connections": {
+    "Start Rollback Status and Telegram Test": {
+      "main": [
+        [
+          {
+            "node": "Prepare Success and Failure Test Cases",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Success and Failure Test Cases": {
+      "main": [
+        [
+          {
+            "node": "Route Success and Failure Tests",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Success and Failure Tests": {
+      "main": [
+        [
+          {
+            "node": "Update Isolated Rollback Status — Success Path",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Intentionally Fail Isolated Data Table Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Isolated Rollback Status — Success Path": {
+      "main": [
+        [
+          {
+            "node": "Telegram — Rollback Success Test",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Intentionally Fail Isolated Data Table Update": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Telegram — Rollback Status Failure Test",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  }
+}
