@@ -1,0 +1,182 @@
+{
+  "name": "Prismbyte — TEMP WF-99 Test Cleanup",
+  "nodes": [
+    {
+      "id": "908bb58c-27de-47af-a544-3e74e52cf414",
+      "name": "Run Test Cleanup",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "94f90811-ee00-4d1f-a2cb-17999f0245dc",
+      "name": "Delete Test Request 588",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "deleteRows",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1wOS4nrBGcXSSFmR"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "request_id",
+              "condition": "eq",
+              "keyValue": "TEST-ERR-588"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "9cadd494-067f-48bc-9408-532d2395140d",
+      "name": "Delete Test Request 590",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        448,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "deleteRows",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1wOS4nrBGcXSSFmR"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "request_id",
+              "condition": "eq",
+              "keyValue": "TEST-ERR-590"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "8238d708-54f3-43fb-ab71-669d1fa737e2",
+      "name": "Delete Test Error Event 588",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        672,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "deleteRows",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "QJE6b6j6MQcTdjVu"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "event_id",
+              "condition": "eq",
+              "keyValue": "ERR-588"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "c55be316-ce67-4517-8321-e6da64f2cc49",
+      "name": "Delete Test Error Event 590",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        896,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "deleteRows",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "QJE6b6j6MQcTdjVu"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "event_id",
+              "condition": "eq",
+              "keyValue": "ERR-590"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Run Test Cleanup": {
+      "main": [
+        [
+          {
+            "node": "Delete Test Request 588",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete Test Request 588": {
+      "main": [
+        [
+          {
+            "node": "Delete Test Request 590",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete Test Request 590": {
+      "main": [
+        [
+          {
+            "node": "Delete Test Error Event 588",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete Test Error Event 588": {
+      "main": [
+        [
+          {
+            "node": "Delete Test Error Event 590",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  }
+}
