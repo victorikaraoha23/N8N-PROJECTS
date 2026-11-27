@@ -1,0 +1,467 @@
+{
+  "name": "Prismbyte — Reddit Trend Discovery",
+  "nodes": [
+    {
+      "id": "a3ae7fb8-f46e-413f-b02b-c9e5ffbf35d0",
+      "name": "Manual Start",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "a48f1534-2afc-4ff2-84ec-c27b8bb2842e",
+      "name": "Inspect Reddit Posts Dataset",
+      "type": "@brightdata/n8n-nodes-brightdata.brightData",
+      "typeVersion": 1,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "resource": "marketplaceDataset",
+        "operation": "getDatasetMetadata",
+        "dataset_id": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gd_lvz8ah06191smkebj4"
+        },
+        "status": "collecting"
+      },
+      "credentials": {
+        "brightdataApi": {
+          "id": "l5yOfpHzFED5RbQf",
+          "name": "BrightData account"
+        }
+      }
+    },
+    {
+      "id": "9d437b47-5241-4148-b507-5395cf1a18d6",
+      "name": "BrightData API — Check Snapshot Progress",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        480,
+        160
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.brightdata.com/datasets/v3/progress/sd_mwtiwona1yy3iul6kh",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "brightdataApi",
+        "options": {}
+      },
+      "credentials": {
+        "brightdataApi": {
+          "id": "l5yOfpHzFED5RbQf",
+          "name": "BrightData account"
+        }
+      }
+    },
+    {
+      "id": "7c3930d0-38bb-450b-8af8-67626556f5b3",
+      "name": "Draft — Trigger Reddit Keyword Collection (DISABLED)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        480,
+        400
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.brightdata.com/datasets/v3/trigger",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "brightdataApi",
+        "sendQuery": true,
+        "specifyQuery": "keypair",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "dataset_id",
+              "value": "gd_lvz8ah06191smkebj4"
+            },
+            {
+              "name": "type",
+              "value": "discover_new"
+            },
+            {
+              "name": "discover_by",
+              "value": "keyword"
+            },
+            {
+              "name": "format",
+              "value": "json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "[{\"keyword\":\"AI tools\",\"date\":\"Past week\",\"num_of_posts\":5},{\"keyword\":\"SaaS\",\"date\":\"Past week\",\"num_of_posts\":5},{\"keyword\":\"workflow automation\",\"date\":\"Past week\",\"num_of_posts\":5}]",
+        "options": {}
+      },
+      "credentials": {
+        "brightdataApi": {
+          "id": "l5yOfpHzFED5RbQf",
+          "name": "BrightData account"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "id": "0233fa91-c734-42f0-9832-3a406e0584f3",
+      "name": "BrightData — Download Completed Reddit Snapshot",
+      "type": "@brightdata/n8n-nodes-brightdata.brightData",
+      "typeVersion": 1,
+      "position": [
+        720,
+        160
+      ],
+      "parameters": {
+        "resource": "webScrapper",
+        "operation": "downloadSnapshot",
+        "snapshot_id": "sd_mwtiwona1yy3iul6kh",
+        "format": "json",
+        "split_into_parts": false,
+        "compress": false
+      },
+      "credentials": {
+        "brightdataApi": {
+          "id": "l5yOfpHzFED5RbQf",
+          "name": "BrightData account"
+        }
+      }
+    },
+    {
+      "id": "5d819f42-dc7a-47f3-9d56-05f77bce7fa2",
+      "name": "Filter Posts — Rolling 7 Days",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        160
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const now = Date.now();\nconst cutoff = now - 7 * 24 * 60 * 60 * 1000;\n\nconst recent = $input.all()\n  .filter(item => {\n    const postedAt = Date.parse(item.json.date_posted || \"\");\n    return Number.isFinite(postedAt) && postedAt >= cutoff && postedAt <= now;\n  })\n  .map(item => {\n    const postedAt = Date.parse(item.json.date_posted);\n    const ageHours = (now - postedAt) / 3600000;\n    return {\n      json: {\n        ...item.json,\n        discovery_window: \"rolling_previous_7_days\",\n        age_hours: Math.round(ageHours * 100) / 100,\n        age_days: Math.round((ageHours / 24) * 100) / 100\n      },\n      pairedItem: item.pairedItem\n    };\n  })\n  .sort((a, b) => {\n    const engagementA = Number(a.json.num_upvotes || 0) + Number(a.json.num_comments || 0);\n    const engagementB = Number(b.json.num_upvotes || 0) + Number(b.json.num_comments || 0);\n    return engagementB - engagementA;\n  });\n\nreturn recent;"
+      }
+    },
+    {
+      "id": "988b1237-6742-446f-a6c4-b15c95c31f3f",
+      "name": "Fetch Published Prismbyte Article Index",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1200,
+        160
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.github.com/repos/victorikaraoha23/prismbyte/contents/src/content/articles",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            },
+            {
+              "name": "X-GitHub-Api-Version",
+              "value": "2022-11-28"
+            }
+          ]
+        },
+        "options": {},
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubApi"
+      },
+      "credentials": {
+        "githubApi": {
+          "id": "n7jUeXRd8ZbdEArn",
+          "name": "GitHub account"
+        }
+      }
+    },
+    {
+      "id": "f263d73f-926f-4d24-bcdb-9c6f138dba82",
+      "name": "Check Published Article Overlap",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1440,
+        160
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const files = $input.all().map(item => item.json).filter(file =>\n  file && file.type === \"file\" && typeof file.name === \"string\" && file.name.endsWith(\".md\")\n);\nconst uniqueFiles = [...new Map(files.map(file => [file.name, file])).values()];\nconst published = uniqueFiles.map(file => {\n  const slug = file.name.replace(/\\.md$/i, \"\");\n  return { slug, title_from_slug: slug.replace(/[-_]+/g, \" \"), path: file.path, url: file.html_url };\n});\nconst stopWords = new Set([\"the\",\"a\",\"an\",\"and\",\"or\",\"to\",\"of\",\"for\",\"in\",\"on\",\"with\",\"is\",\"are\",\"what\",\"how\",\"without\",\"your\",\"you\",\"it\",\"its\",\"actually\",\"from\",\"their\",\"they\",\"be\",\"do\",\"does\",\"can\",\"i\",\"we\",\"our\"]);\nconst tokens = value => String(value || \"\").toLowerCase().replace(/[^a-z0-9\\\\s-]/g, \" \").split(/[\\\\s-]+/).filter(word => word.length > 2 && !stopWords.has(word));\nconst posts = $items(\"Filter Posts — Rolling 7 Days\").map(item => item.json);\nreturn posts.map(post => {\n  const postTokens = new Set(tokens(post.title));\n  const overlaps = published.map(article => {\n    const articleTokens = new Set(tokens(article.title_from_slug));\n    const intersection = [...postTokens].filter(token => articleTokens.has(token));\n    const union = new Set([...postTokens, ...articleTokens]);\n    return { ...article, lexical_similarity: union.size ? Math.round((intersection.length / union.size) * 100) / 100 : 0, shared_terms: intersection };\n  }).filter(article => article.lexical_similarity >= 0.15).sort((a, b) => b.lexical_similarity - a.lexical_similarity);\n  return { json: { ...post, published_article_count: published.length, published_article_index: published, possible_published_overlaps: overlaps, duplicate_check: overlaps.length ? \"REVIEW_POSSIBLE_OVERLAP\" : \"NO_LEXICAL_OVERLAP\" } };\n});"
+      }
+    },
+    {
+      "id": "f866f7b6-27a1-40bf-a6b4-4c800abc5a82",
+      "name": "Aggregate Reddit Candidates",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1680,
+        160
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const candidates = $input.all().map(item => {\n  const p = item.json;\n  const comments = Array.isArray(p.comments) ? p.comments.slice(0, 5).map(c => ({\n    text: String(c.comment || c.reply || \"\").slice(0, 300),\n    upvotes: Number(c.num_upvotes || 0)\n  })) : [];\n  return {\n    title: p.title,\n    subreddit: p.community_name,\n    posted_at: p.date_posted,\n    age_hours: p.age_hours,\n    age_days: p.age_days,\n    discovery_window: p.discovery_window,\n    upvotes: Number(p.num_upvotes || 0),\n    comments_count: Number(p.num_comments || 0),\n    url: p.url,\n    description: String(p.description || \"\").slice(0, 1800),\n    comment_sample: comments,\n    duplicate_check: p.duplicate_check,\n    possible_published_overlaps: p.possible_published_overlaps || []\n  };\n});\nconst published = $input.first()?.json?.published_article_index || [];\nreturn [{ json: { candidates, candidate_count: candidates.length, discovery_window: \"rolling_previous_7_days\", published_articles: published.map(a => ({title: a.title_from_slug, slug: a.slug})) } }];"
+      }
+    },
+    {
+      "id": "a89e7cb8-2ccb-435a-94fe-96ed9464d7c3",
+      "name": "Analyze Reddit Trends — NVIDIA",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1920,
+        160
+      ],
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ \"Assess these Reddit candidates for Prismbyte. Return only the concise report required by the system instructions.\\\\n\\\\nINPUT DATA:\\\\n\" + JSON.stringify($json) }}",
+        "enableStreaming": false,
+        "options": {
+          "systemMessage": "You are Prismbyte's Reddit topic analyst. Analyze only the supplied posts and current published-article index. Reddit engagement is a qualitative audience signal, NOT proof of search demand, market size, or factual accuracy. Never invent evidence.\n\nPrismbyte covers practical AI SaaS tools and workflow automation. Prioritize specific tool use, comparisons, workflow problems, implementation questions, and recurring audience pain. Reject spam, unrelated posts, obvious promotions, and weak generic discussion.\n\nFor each candidate score 0-5 for (a) Prismbyte relevance, (b) audience pain, (c) engagement signal based only on supplied upvotes/comments, and (d) novelty versus published articles. Explain likely overlap. Lexical similarity is only a warning; it does not prove a duplicate. Do not claim recurrence from one post.\n\nReturn no more than 450 words:\n1. Batch summary with exact candidate count and fit.\n2. Ranked opportunities (title/angle, audience problem, subreddit, date, upvotes, comments, URL, four scores, overlap, confidence).\n3. Rejected/monitor candidates and why.\n4. Recommendation: RECOMMEND, MONITOR, or REJECT.\n5. Caveat: the workflow filters the complete rolling previous 7-day window from the posts returned by Bright Data's Past week keyword discovery. The current validation snapshot is capped at 15 records, so it is a sample rather than an exhaustive capture of every relevant Reddit post from the week. Do not describe it as exhaustive.\n\nDo not draft an article, perform external research, claim search volume, publish, create affiliate links, or send messages. Do not include hidden reasoning. The final line must be exactly: END OF TREND REPORT",
+          "maxIterations": 2,
+          "returnIntermediateSteps": false
+        }
+      }
+    },
+    {
+      "id": "a30e21d0-e97c-42ec-bf45-b2fb18885541",
+      "name": "NVIDIA Nemotron — Reddit Trend Analysis",
+      "type": "@n8n/n8n-nodes-langchain.lmChatNvidia",
+      "typeVersion": 1,
+      "position": [
+        1920,
+        400
+      ],
+      "parameters": {
+        "model": "={{ \"nvidia/nemotron-3.5-super-vl-120b-a12b\" }}",
+        "options": {
+          "temperature": 0.2,
+          "maxTokens": 10000,
+          "timeout": 360000,
+          "maxRetries": 2
+        }
+      },
+      "credentials": {
+        "nvidiaApi": {
+          "id": "YX5QWgZzVmrNJnwP",
+          "name": "NVIDIA Nemotron account"
+        }
+      }
+    },
+    {
+      "id": "635e0432-41f2-4bfa-a8f1-052a2fb4b48a",
+      "name": "Validate Trend Report Completion",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2160,
+        160
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const report = String($json.output || \"\").trim();\nconst complete = report.endsWith(\"END OF TREND REPORT\");\nreturn [{ json: { analysis_status: complete ? \"COMPLETE\" : \"HOLD_INCOMPLETE\", report, report_characters: report.length, completion_marker_present: complete } }];"
+      }
+    },
+    {
+      "id": "ee7dc985-a5c2-418d-9eff-c74fd46bce4c",
+      "name": "Send Ranked Topics to Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2400,
+        160
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "7392605484",
+        "text": "={{ 'PRISMBYTE — REDDIT TOPIC REVIEW\\n\\n' + String($json.report || '').replace(/[_*\\[\\]`]/g, '').replace(/&/g, 'and') + '\\n\\nREVIEW ACTION\\nTo develop a topic, use the Prismbyte Content Assistant: send /draft, then send the chosen topic in a separate message. Review the repeated topic and send /confirm to start WF-01, or /cancel to discard it. Nothing is published automatically yet.' }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "disable_web_page_preview": true
+        }
+      },
+      "webhookId": "396209ca-9d92-47ce-abc0-a8bdb752a242",
+      "credentials": {
+        "telegramApi": {
+          "id": "q7UPlO6TvQBq87lT",
+          "name": "prismbyte telegram bot"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000
+    },
+    {
+      "id": "55ad0f6a-6916-4827-affb-a2ed979eae9d",
+      "name": "Is Trend Report Complete?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2320,
+        160
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.analysis_status }}",
+              "rightValue": "COMPLETE",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Manual Start": {
+      "main": [
+        [
+          {
+            "node": "Inspect Reddit Posts Dataset",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "BrightData API — Check Snapshot Progress",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Draft — Trigger Reddit Keyword Collection (DISABLED)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "BrightData — Download Completed Reddit Snapshot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BrightData — Download Completed Reddit Snapshot": {
+      "main": [
+        [
+          {
+            "node": "Filter Posts — Rolling 7 Days",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Published Prismbyte Article Index": {
+      "main": [
+        [
+          {
+            "node": "Check Published Article Overlap",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Published Article Overlap": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Reddit Candidates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Reddit Candidates": {
+      "main": [
+        [
+          {
+            "node": "Analyze Reddit Trends — NVIDIA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "NVIDIA Nemotron — Reddit Trend Analysis": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Analyze Reddit Trends — NVIDIA",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze Reddit Trends — NVIDIA": {
+      "main": [
+        [
+          {
+            "node": "Validate Trend Report Completion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Posts — Rolling 7 Days": {
+      "main": [
+        [
+          {
+            "node": "Fetch Published Prismbyte Article Index",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Trend Report Completion": {
+      "main": [
+        [
+          {
+            "node": "Is Trend Report Complete?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Trend Report Complete?": {
+      "main": [
+        [
+          {
+            "node": "Send Ranked Topics to Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  }
+}
