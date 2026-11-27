@@ -1,0 +1,157 @@
+{
+  "name": "Prismbyte — TEMP WF-99 Failure Test",
+  "nodes": [
+    {
+      "id": "d08f55bf-548e-4510-95fa-f33f9ecfcecf",
+      "name": "Isolated Test Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "prismbyte-wf99-failure-test",
+        "responseMode": "onReceived"
+      },
+      "webhookId": "3476a156-70e1-4841-9afa-c3799a0fe049"
+    },
+    {
+      "id": "3ba61466-c46e-4929-9ea1-a9183044b685",
+      "name": "Insert Isolated Test Request",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "insert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1wOS4nrBGcXSSFmR"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "request_id": "={{ 'TEST-ERR-' + $execution.id }}",
+            "telegram_chat_id": "TEST",
+            "telegram_user_id": "TEST",
+            "command": "test",
+            "topic": "WF-99 isolated failure test",
+            "request_status": "researching",
+            "article_id": "TEST-ARTICLE",
+            "created_at": "={{ $now.toISO() }}",
+            "updated_at": "={{ $now.toISO() }}",
+            "last_error": "",
+            "execution_id": "={{ String($execution.id) }}"
+          },
+          "schema": [
+            {
+              "id": "request_id",
+              "displayName": "request_id",
+              "type": "string"
+            },
+            {
+              "id": "telegram_chat_id",
+              "displayName": "telegram_chat_id",
+              "type": "string"
+            },
+            {
+              "id": "telegram_user_id",
+              "displayName": "telegram_user_id",
+              "type": "string"
+            },
+            {
+              "id": "command",
+              "displayName": "command",
+              "type": "string"
+            },
+            {
+              "id": "topic",
+              "displayName": "topic",
+              "type": "string"
+            },
+            {
+              "id": "request_status",
+              "displayName": "request_status",
+              "type": "string"
+            },
+            {
+              "id": "article_id",
+              "displayName": "article_id",
+              "type": "string"
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "type": "date"
+            },
+            {
+              "id": "updated_at",
+              "displayName": "updated_at",
+              "type": "date"
+            },
+            {
+              "id": "last_error",
+              "displayName": "last_error",
+              "type": "string"
+            },
+            {
+              "id": "execution_id",
+              "displayName": "execution_id",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "d4d3ca13-761e-43aa-a8a6-f0ff46f0b2fd",
+      "name": "Deliberate Test Failure",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "throw new Error('WF-99 isolated failure correlation test');"
+      }
+    }
+  ],
+  "connections": {
+    "Isolated Test Webhook": {
+      "main": [
+        [
+          {
+            "node": "Insert Isolated Test Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Isolated Test Request": {
+      "main": [
+        [
+          {
+            "node": "Deliberate Test Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "errorWorkflow": "H4RRkVb2YuCVgaKu"
+  }
+}
