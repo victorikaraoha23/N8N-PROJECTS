@@ -1,0 +1,98 @@
+{
+  "name": "Prismbyte — Isolated Telegram Review Command Routing Test",
+  "nodes": [
+    {
+      "id": "f1c8467c-ff96-41f6-a96f-a946fed4eab1",
+      "name": "Manual Start — Telegram Command Routing Test",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "72922422-0ea8-4c5e-879e-3327625e83b6",
+      "name": "Send Nonexistent-ID Approve Test Command",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "7392605484",
+        "text": "/approve PB-TEST-APPROVE-20261124",
+        "additionalFields": {
+          "appendAttribution": false,
+          "disable_web_page_preview": true
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "q7UPlO6TvQBq87lT",
+          "name": "prismbyte telegram bot"
+        }
+      },
+      "webhookId": "1f56effa-0171-4bc6-9958-5f67582194ac"
+    },
+    {
+      "id": "bbc10897-38fa-4ea6-80c0-0fbdea44a2bc",
+      "name": "Send Nonexistent-ID Reject Test Command",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        448,
+        0
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "7392605484",
+        "text": "/reject PB-TEST-REJECT-20261124",
+        "additionalFields": {
+          "appendAttribution": false,
+          "disable_web_page_preview": true
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "q7UPlO6TvQBq87lT",
+          "name": "prismbyte telegram bot"
+        }
+      },
+      "webhookId": "a8173008-8057-4275-b802-04778f2fff6e"
+    }
+  ],
+  "connections": {
+    "Manual Start — Telegram Command Routing Test": {
+      "main": [
+        [
+          {
+            "node": "Send Nonexistent-ID Approve Test Command",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Nonexistent-ID Approve Test Command": {
+      "main": [
+        [
+          {
+            "node": "Send Nonexistent-ID Reject Test Command",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  }
+}
