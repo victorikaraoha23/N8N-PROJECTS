@@ -1,0 +1,58 @@
+{
+  "name": "OpenMontage - Supabase Connectivity Test",
+  "nodes": [
+    {
+      "id": "1188f002-1cd6-4872-a17e-18387486dc2d",
+      "name": "Manual Test Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "68ecc9ff-d5a1-4a59-8bd7-4172c30fa2a0",
+      "name": "Read OpenMontage Products",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "getAll",
+        "authentication": "secretKey",
+        "tableId": "products",
+        "returnAll": false,
+        "limit": 1,
+        "filterType": "none"
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "VIp2iiJEEE7xS20g",
+          "name": "Supabase account 2"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Manual Test Trigger": {
+      "main": [
+        [
+          {
+            "node": "Read OpenMontage Products",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  }
+}
