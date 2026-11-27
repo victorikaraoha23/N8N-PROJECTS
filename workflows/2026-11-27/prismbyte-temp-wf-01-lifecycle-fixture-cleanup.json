@@ -1,0 +1,102 @@
+{
+  "name": "Prismbyte — TEMP WF-01 Lifecycle Fixture Cleanup",
+  "nodes": [
+    {
+      "id": "50cffa5b-4b47-4dd6-b861-4383cd10cd68",
+      "name": "Run Lifecycle Fixture Cleanup",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "7fe34028-f044-4b87-b1e6-0dc04a5b7339",
+      "name": "Delete Cancel Fixture",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "deleteRows",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1wOS4nrBGcXSSFmR"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "request_id",
+              "condition": "eq",
+              "keyValue": "TEST-LC-CANCEL-20261125"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "db36f044-b5a5-4bf4-84ec-d1ea02998919",
+      "name": "Delete Expiry Fixture",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        448,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "deleteRows",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1wOS4nrBGcXSSFmR"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "request_id",
+              "condition": "eq",
+              "keyValue": "TEST-LC-EXPIRY-20261125"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Run Lifecycle Fixture Cleanup": {
+      "main": [
+        [
+          {
+            "node": "Delete Cancel Fixture",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete Cancel Fixture": {
+      "main": [
+        [
+          {
+            "node": "Delete Expiry Fixture",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  }
+}
